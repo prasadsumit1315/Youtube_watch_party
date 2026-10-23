@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+*/node_modules/
+
+# Production builds
+dist/
+*/dist/
+build/
+*/build/
+
+# Environment files
+.env
+*.env
+*.env.local
+!*.env.example
+server/.env
+client/.env
+
+# Local cache & logs
+*.log
+.DS_Store
+coverage/
+.prisma/
+.rooms-cache.json
+*/.rooms-cache.json

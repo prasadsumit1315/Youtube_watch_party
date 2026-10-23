@@ -1,0 +1,331 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { createRoom, checkRoomExists, pingServer } from '../services/api.js';
+import {
+  Tv,
+  Users,
+  Sparkles,
+  ArrowRight,
+  Shield,
+  PlayCircle,
+} from 'lucide-react';
+
+export const LandingPage: React.FC = () => {
+  const navigate = useNavigate();
+
+  const [activeTab, setActiveTab] = useState<'create' | 'join'>('create');
+  const [hostName, setHostName] = useState(
+    () => sessionStorage.getItem('wp_username') || ''
+  );
+  const [videoUrl, setVideoUrl] = useState('');
+  const [joinCode, setJoinCode] = useState('');
+  const [joinName, setJoinName] = useState(
+    () => sessionStorage.getItem('wp_username') || ''
+  );
+  const [isLoading, setIsLoading] = useState(false);
+  const [serverWaking, setServerWaking] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Check backend server status on mount
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    const probe = async () => {
+      const isUp = await pingServer();
+      if (!isUp) {
+        setServerWaking(true);
+        timer = setTimeout(probe, 4000);
+      } else {
+        setServerWaking(false);
+      }
+    };
+    probe();
+    return () => clearTimeout(timer);
+  }, []);
+
+  const handleCreateRoom = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMessage(null);
+    const trimmedName = hostName.trim();
+    if (!trimmedName) {
+      setErrorMessage('Please enter a display name');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      sessionStorage.setItem('wp_username', trimmedName);
+      const res = await createRoom(trimmedName, videoUrl.trim() || undefined);
+      navigate(`/room/${res.roomId}`);
+    } catch (err) {
+      setErrorMessage((err as Error).message || 'Failed to create room');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleJoinRoom = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMessage(null);
+    const trimmedCode = joinCode.trim();
+    const trimmedName = joinName.trim();
+
+    if (!trimmedCode) {
+      setErrorMessage('Please enter a room code or link');
+      return;
+    }
+    if (!trimmedName) {
+      setErrorMessage('Please enter your display name');
+      return;
+    }
+
+    // Extract code if user pasted a full URL
+    let targetCode = trimmedCode;
+    try {
+      if (trimmedCode.includes('/room/')) {
+        const parts = trimmedCode.split('/room/');
+        targetCode = parts[1].split('?')[0].split('/')[0];
+      }
+    } catch {
+      targetCode = trimmedCode;
+    }
+
+    try {
+      setIsLoading(true);
+      const exists = await checkRoomExists(targetCode);
+      if (!exists) {
+        setErrorMessage('Room not found. Check code or create a new room.');
+        return;
+      }
+
+      sessionStorage.setItem('wp_username', trimmedName);
+      navigate(`/room/${targetCode}`);
+    } catch (err) {
+      setErrorMessage('Failed to verify room');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-brand-darkBg flex flex-col justify-between selection:bg-brand-pink/30 selection:text-white">
+      {/* Background glow effects */}
+      <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[700px] h-[350px] bg-gradient-to-b from-brand-violet/20 via-brand-pink/10 to-transparent blur-[120px] pointer-events-none" />
+
+      {/* Header Bar */}
+      <header className="relative z-10 max-w-6xl mx-auto w-full px-6 py-6 flex items-center justify-between">
+        <div className="flex items-center gap-2.5 cursor-pointer">
+          <div className="w-10 h-10 rounded-theme bg-gradient-to-tr from-brand-violet to-brand-pink flex items-center justify-center shadow-lg">
+            <Tv className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <h1 className="text-xl font-extrabold tracking-tight gradient-text">
+              WatchParty
+            </h1>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 text-xs text-slate-400">
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+          Real-time Sync
+        </div>
+      </header>
+
+      {/* Main Hero & Forms */}
+      <main className="relative z-10 max-w-4xl mx-auto w-full px-6 py-8 flex flex-col items-center">
+        {serverWaking && (
+          <div className="mb-6 px-4 py-2.5 rounded-theme bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center gap-2 shadow-lg animate-fade-in">
+            <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+            Backend server is spinning up on Render free tier (~20s)...
+          </div>
+        )}
+
+        {/* Hero headline */}
+        <div className="text-center max-w-2xl mb-10">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-white/5 border border-white/10 text-brand-pink mb-4">
+            <Sparkles className="w-3.5 h-3.5" /> High-fidelity Synchronized YouTube Watching
+          </span>
+          <h2 className="text-4xl sm:text-5xl font-black text-slate-100 tracking-tight leading-tight mb-4">
+            Watch Together in <span className="gradient-text">Real-Time</span>
+          </h2>
+          <p className="text-sm sm:text-base text-slate-400 leading-relaxed">
+            Create instant cinematic rooms, invite friends, and watch YouTube videos
+            perfectly in sync with role-based host controls, chat, and live reactions.
+          </p>
+        </div>
+
+        {/* Tab Switcher & Glass Form Card */}
+        <div className="glass-panel w-full max-w-md p-6 sm:p-8 shadow-2xl relative">
+          {/* Tabs */}
+          <div className="grid grid-cols-2 p-1 bg-black/40 rounded-theme border border-white/5 mb-6">
+            <button
+              onClick={() => {
+                setActiveTab('create');
+                setErrorMessage(null);
+              }}
+              className={`py-2.5 text-xs font-semibold rounded-lg transition ${
+                activeTab === 'create'
+                  ? 'bg-gradient-to-r from-brand-violet to-brand-pink text-white shadow-md'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Create New Room
+            </button>
+            <button
+              onClick={() => {
+                setActiveTab('join');
+                setErrorMessage(null);
+              }}
+              className={`py-2.5 text-xs font-semibold rounded-lg transition ${
+                activeTab === 'join'
+                  ? 'bg-gradient-to-r from-brand-violet to-brand-pink text-white shadow-md'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Join by Code / Link
+            </button>
+          </div>
+
+          {errorMessage && (
+            <div className="mb-4 p-3 rounded-theme bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs leading-relaxed animate-fade-in">
+              {errorMessage}
+            </div>
+          )}
+
+          {activeTab === 'create' ? (
+            <form onSubmit={handleCreateRoom} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
+                  Your Display Name <span className="text-brand-pink">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  maxLength={24}
+                  value={hostName}
+                  onChange={(e) => setHostName(e.target.value)}
+                  placeholder="e.g. Alex"
+                  className="w-full px-4 py-2.5 bg-brand-darkSurface border border-white/10 rounded-theme text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-brand-pink transition"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
+                  Initial YouTube URL or ID <span className="text-slate-500 font-normal">(Optional)</span>
+                </label>
+                <input
+                  type="text"
+                  value={videoUrl}
+                  onChange={(e) => setVideoUrl(e.target.value)}
+                  placeholder="https://www.youtube.com/watch?v=..."
+                  className="w-full px-4 py-2.5 bg-brand-darkSurface border border-white/10 rounded-theme text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-brand-pink transition"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full gradient-btn py-3 rounded-theme font-semibold text-sm text-white shadow-xl flex items-center justify-center gap-2 mt-2 disabled:opacity-50"
+              >
+                {isLoading ? (
+                  'Creating Room...'
+                ) : (
+                  <>
+                    Create WatchParty Room <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={handleJoinRoom} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
+                  Room Code or Invite Link <span className="text-brand-pink">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={joinCode}
+                  onChange={(e) => setJoinCode(e.target.value)}
+                  placeholder="e.g. 7X8K2M9P or paste URL"
+                  className="w-full px-4 py-2.5 bg-brand-darkSurface border border-white/10 rounded-theme text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-brand-pink transition"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
+                  Your Display Name <span className="text-brand-pink">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  maxLength={24}
+                  value={joinName}
+                  onChange={(e) => setJoinName(e.target.value)}
+                  placeholder="e.g. Sam"
+                  className="w-full px-4 py-2.5 bg-brand-darkSurface border border-white/10 rounded-theme text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-brand-pink transition"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full gradient-btn py-3 rounded-theme font-semibold text-sm text-white shadow-xl flex items-center justify-center gap-2 mt-2 disabled:opacity-50"
+              >
+                {isLoading ? (
+                  'Connecting...'
+                ) : (
+                  <>
+                    Join WatchParty Room <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+            </form>
+          )}
+        </div>
+
+        {/* Feature Highlights Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-12 w-full">
+          <div className="glass-card p-5">
+            <div className="w-8 h-8 rounded-lg bg-pink-500/10 text-pink-400 flex items-center justify-center mb-3">
+              <PlayCircle className="w-4 h-4" />
+            </div>
+            <h3 className="text-sm font-semibold text-slate-200 mb-1">
+              Synchronized Playback
+            </h3>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              Sub-second drift correction continuously aligns player timestamps for all viewers.
+            </p>
+          </div>
+
+          <div className="glass-card p-5">
+            <div className="w-8 h-8 rounded-lg bg-violet-500/10 text-violet-400 flex items-center justify-center mb-3">
+              <Shield className="w-4 h-4" />
+            </div>
+            <h3 className="text-sm font-semibold text-slate-200 mb-1">
+              Role-Based Control
+            </h3>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              Host and Moderators maintain control while participants request actions politely.
+            </p>
+          </div>
+
+          <div className="glass-card p-5">
+            <div className="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-400 flex items-center justify-center mb-3">
+              <Users className="w-4 h-4" />
+            </div>
+            <h3 className="text-sm font-semibold text-slate-200 mb-1">
+              Chat & Reactions
+            </h3>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              Lightweight real-time chat and floating emoji reactions overlaying the stream.
+            </p>
+          </div>
+        </div>
+      </main>
+
+      {/* Footer */}
+      <footer className="relative z-10 max-w-6xl mx-auto w-full px-6 py-6 text-center text-xs text-slate-500 border-t border-white/5">
+        WatchParty • Production Real-Time YouTube Synchronizer • No Trackers • Ephemeral Sessions
+      </footer>
+    </div>
+  );
+};

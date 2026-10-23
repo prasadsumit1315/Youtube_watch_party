@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: watchparty-server
+    runtime: node
+    plan: free
+    region: oregon
+    rootDir: server
+    buildCommand: npm ci && npx prisma generate && npm run build && npx prisma migrate deploy
+    startCommand: node dist/index.js
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: CLIENT_ORIGIN
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+      - key: PERSIST_CHAT
+        value: false
+      - key: LOG_LEVEL
+        value: info

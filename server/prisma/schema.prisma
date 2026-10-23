@@ -1,0 +1,95 @@
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  HOST
+  MODERATOR
+  PARTICIPANT
+}
+
+enum AuditAction {
+  ROOM_CREATED
+  ROLE_ASSIGNED
+  MEMBER_REMOVED
+  HOST_TRANSFERRED
+  VIDEO_CHANGED
+}
+
+model Room {
+  id             String        @id @default(uuid()) @db.Uuid
+  code           String        @unique @db.VarChar(8)
+  currentVideoId String?       @map("current_video_id") @db.VarChar(32)
+  hostUserId     String        @map("host_user_id") @db.Uuid
+  createdAt      DateTime      @default(now()) @map("created_at")
+  lastActiveAt   DateTime      @default(now()) @map("last_active_at")
+  expiresAt      DateTime      @map("expires_at")
+  isClosed       Boolean       @default(false) @map("is_closed")
+
+  members        Member[]
+  bannedUsers    BannedUser[]
+  chatMessages   ChatMessage[]
+  auditLogs      AuditLog[]
+
+  @@map("rooms")
+}
+
+model Member {
+  id        String    @id @default(uuid()) @db.Uuid
+  roomId    String    @map("room_id") @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  username  String    @db.VarChar(24)
+  role      Role      @default(PARTICIPANT)
+  joinedAt  DateTime  @default(now()) @map("joined_at")
+  leftAt    DateTime? @map("left_at")
+
+  room      Room      @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@unique([roomId, userId])
+  @@map("members")
+}
+
+model BannedUser {
+  id        String   @id @default(uuid()) @db.Uuid
+  roomId    String   @map("room_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  bannedAt  DateTime @default(now()) @map("banned_at")
+  bannedBy  String   @map("banned_by") @db.Uuid
+
+  room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@unique([roomId, userId])
+  @@map("banned_users")
+}
+
+model ChatMessage {
+  id        String   @id @default(uuid()) @db.Uuid
+  roomId    String   @map("room_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  username  String   @db.VarChar(24)
+  text      String   @db.VarChar(300)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@map("chat_messages")
+}
+
+model AuditLog {
+  id           String      @id @default(uuid()) @db.Uuid
+  roomId       String      @map("room_id") @db.Uuid
+  actorUserId  String      @map("actor_user_id") @db.Uuid
+  action       AuditAction
+  targetUserId String?     @map("target_user_id") @db.Uuid
+  createdAt    DateTime    @default(now()) @map("created_at")
+
+  room         Room        @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@map("audit_logs")
+}
