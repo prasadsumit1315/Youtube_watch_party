@@ -3,6 +3,7 @@ import { db } from '../db/client.js';
 import { logger } from '../utils/logger.js';
 
 export interface CreateRoomInput {
+  id?: string;
   code: string;
   hostUserId: string;
   hostUsername: string;
@@ -23,6 +24,7 @@ export class RoomRepository {
     return this.prisma.$transaction(async (tx) => {
       const room = await tx.room.create({
         data: {
+          id: input.id,
           code: input.code,
           currentVideoId: input.currentVideoId ?? null,
           hostUserId: input.hostUserId,

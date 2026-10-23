@@ -69,6 +69,7 @@ export class RoomManager {
     try {
       if (env.DATABASE_URL) {
         await this.roomRepo.createRoomWithHost({
+          id: roomId,
           code,
           hostUserId,
           hostUsername,

@@ -230,6 +230,25 @@ export class SocketMessageHandler {
             reconnectToken: participant.reconnectToken,
           });
 
+          // Send recent chat history if stored in DB
+          if (env.PERSIST_CHAT && env.DATABASE_URL) {
+            try {
+              const history = await this.chatRepo.getRecentMessages(room.id, 50);
+              if (history && history.length > 0) {
+                const formatted = history.reverse().map((m) => ({
+                  id: m.id,
+                  userId: m.userId,
+                  username: m.username,
+                  text: m.text,
+                  createdAt: m.createdAt.getTime(),
+                }));
+                socket.emit('chat_history', formatted);
+              }
+            } catch {
+              // Ignore if chat history fetch fails
+            }
+          }
+
           // Notify other participants in the room
           if (!isReconnect) {
             socket.to(room.id).emit('user_joined', {

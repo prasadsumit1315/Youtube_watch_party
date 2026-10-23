@@ -249,7 +249,7 @@ export const YouTubePlayer: React.FC = () => {
 
       // On explicit server action (seek, play, pause, etc.), execute seek immediately if out of sync
       if (isNewServerAction) {
-        if (Math.abs(playerCurrentTime - clampedExpected) > 1.5) {
+        if (Math.abs(playerCurrentTime - clampedExpected) > 0.8) {
           player.seekTo(clampedExpected, true);
           setCurrentPlayTime(clampedExpected);
         }
@@ -288,7 +288,11 @@ export const YouTubePlayer: React.FC = () => {
         const player = playerRef.current;
         const playerTime = player.getCurrentTime?.() || 0;
         const dur = player.getDuration?.() || 0;
-        setCurrentPlayTime(playerTime);
+
+        // Only update currentPlayTime if not in a user programmatic seek
+        if (!isProgrammaticAction.current) {
+          setCurrentPlayTime(playerTime);
+        }
         if (dur > 0) setVideoDuration(dur);
 
         // Drift check every 2 seconds (every 4 ticks of 500ms)
@@ -361,38 +365,87 @@ export const YouTubePlayer: React.FC = () => {
   // Skip forward 10s
   const handleSkipForward = () => {
     handleUnmuteAudio();
-    const current = (playerRef.current?.getCurrentTime ? playerRef.current.getCurrentTime() : null) ?? currentPlayTime ?? 0;
-    const dur = (playerRef.current?.getDuration ? playerRef.current.getDuration() : null) || videoDuration || 0;
+    isProgrammaticAction.current = true;
+
+    let current = currentPlayTime || 0;
+    try {
+      if (playerRef.current && typeof playerRef.current.getCurrentTime === 'function') {
+        const t = playerRef.current.getCurrentTime();
+        if (typeof t === 'number' && !isNaN(t)) {
+          current = t;
+        }
+      }
+    } catch {
+      // ignore
+    }
+
+    let dur = videoDuration || 0;
+    try {
+      if (playerRef.current && typeof playerRef.current.getDuration === 'function') {
+        const d = playerRef.current.getDuration();
+        if (typeof d === 'number' && !isNaN(d) && d > 0) {
+          dur = d;
+        }
+      }
+    } catch {
+      // ignore
+    }
+
     const target = dur > 0 ? Math.min(dur, current + 10) : current + 10;
     setCurrentPlayTime(target);
+
+    try {
+      playerRef.current?.seekTo?.(target, true);
+    } catch {
+      // ignore
+    }
+
     if (canControl) {
-      try {
-        playerRef.current?.seekTo?.(target, true);
-      } catch {
-        // ignore
-      }
       seek(target);
     } else {
       requestAction('SEEK', target);
     }
+
+    setTimeout(() => {
+      isProgrammaticAction.current = false;
+    }, 1500);
   };
 
   // Skip backward 10s
   const handleSkipBackward = () => {
     handleUnmuteAudio();
-    const current = (playerRef.current?.getCurrentTime ? playerRef.current.getCurrentTime() : null) ?? currentPlayTime ?? 0;
+    isProgrammaticAction.current = true;
+
+    let current = currentPlayTime || 0;
+    try {
+      if (playerRef.current && typeof playerRef.current.getCurrentTime === 'function') {
+        const t = playerRef.current.getCurrentTime();
+        if (typeof t === 'number' && !isNaN(t)) {
+          current = t;
+        }
+      }
+    } catch {
+      // ignore
+    }
+
     const target = Math.max(0, current - 10);
     setCurrentPlayTime(target);
+
+    try {
+      playerRef.current?.seekTo?.(target, true);
+    } catch {
+      // ignore
+    }
+
     if (canControl) {
-      try {
-        playerRef.current?.seekTo?.(target, true);
-      } catch {
-        // ignore
-      }
       seek(target);
     } else {
       requestAction('SEEK', target);
     }
+
+    setTimeout(() => {
+      isProgrammaticAction.current = false;
+    }, 1500);
   };
 
   // Seek Scrubber

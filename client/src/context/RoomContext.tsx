@@ -222,6 +222,10 @@ export const RoomProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setChatMessages((prev) => [...prev.slice(-150), msg]);
     };
 
+    const handleChatHistory = (history: ChatMessage[]) => {
+      setChatMessages(history);
+    };
+
     const handleReaction = (rx: ReactionEvent) => {
       setReactions((prev) => [...prev.slice(-20), rx]);
       // Auto-clear reaction after 3 seconds
@@ -255,6 +259,7 @@ export const RoomProvider: React.FC<{ children: React.ReactNode }> = ({ children
     socket.on('action_requested', handleActionRequested);
     socket.on('action_rejected', handleActionRejected);
     socket.on('chat_message', handleChatMessage);
+    socket.on('chat_history', handleChatHistory);
     socket.on('reaction', handleReaction);
     socket.on('error_event', handleErrorEvent);
     socket.on('removed', handleRemoved);
@@ -271,6 +276,7 @@ export const RoomProvider: React.FC<{ children: React.ReactNode }> = ({ children
       socket.off('action_requested', handleActionRequested);
       socket.off('action_rejected', handleActionRejected);
       socket.off('chat_message', handleChatMessage);
+      socket.off('chat_history', handleChatHistory);
       socket.off('reaction', handleReaction);
       socket.off('error_event', handleErrorEvent);
       socket.off('removed', handleRemoved);

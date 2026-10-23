@@ -9,7 +9,7 @@ const envSchema = z.object({
   CLIENT_ORIGIN: z.string().default('https://youtube-watch-party-omega-mocha.vercel.app'),
   DATABASE_URL: z.string().optional(),
   DIRECT_URL: z.string().optional(),
-  PERSIST_CHAT: z.string().default('false').transform((val) => val.toLowerCase() === 'true'),
+  PERSIST_CHAT: z.string().default('true').transform((val) => val.toLowerCase() !== 'false'),
   LOG_LEVEL: z.string().default('info'),
 });
 
