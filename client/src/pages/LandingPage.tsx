@@ -27,7 +27,7 @@ export const LandingPage: React.FC = () => {
 
   // Quietly ping backend server on mount to wake it up if idle
   useEffect(() => {
-    pingServer().catch(() => {});
+    pingServer().catch(() => { });
   }, []);
 
   const handleCreateRoom = async (e: React.FormEvent) => {
@@ -111,10 +111,6 @@ export const LandingPage: React.FC = () => {
             </h1>
           </div>
         </div>
-        <div className="flex items-center gap-2 text-xs text-slate-400">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-          Real-time Sync
-        </div>
       </header>
 
       {/* Main Hero & Forms */}
@@ -143,11 +139,10 @@ export const LandingPage: React.FC = () => {
                 setActiveTab('create');
                 setErrorMessage(null);
               }}
-              className={`py-2.5 text-xs font-semibold rounded-lg transition ${
-                activeTab === 'create'
+              className={`py-2.5 text-xs font-semibold rounded-lg transition ${activeTab === 'create'
                   ? 'bg-gradient-to-r from-brand-violet to-brand-pink text-white shadow-md'
                   : 'text-slate-400 hover:text-slate-200'
-              }`}
+                }`}
             >
               Create New Room
             </button>
@@ -156,11 +151,10 @@ export const LandingPage: React.FC = () => {
                 setActiveTab('join');
                 setErrorMessage(null);
               }}
-              className={`py-2.5 text-xs font-semibold rounded-lg transition ${
-                activeTab === 'join'
+              className={`py-2.5 text-xs font-semibold rounded-lg transition ${activeTab === 'join'
                   ? 'bg-gradient-to-r from-brand-violet to-brand-pink text-white shadow-md'
                   : 'text-slate-400 hover:text-slate-200'
-              }`}
+                }`}
             >
               Join by Code / Link
             </button>
@@ -306,7 +300,14 @@ export const LandingPage: React.FC = () => {
 
       {/* Footer */}
       <footer className="relative z-10 max-w-6xl mx-auto w-full px-6 py-6 text-center text-xs text-slate-500 border-t border-white/5">
-        WatchParty • Production Real-Time YouTube Synchronizer • No Trackers • Ephemeral Sessions
+
+        <div className="footer-bottom">
+          <p>
+            © {new Date().getFullYear()} WatchParty.
+            All rights reserved.
+          </p>
+          <p>Made for movie lovers ❤️</p>
+        </div>
       </footer>
     </div>
   );

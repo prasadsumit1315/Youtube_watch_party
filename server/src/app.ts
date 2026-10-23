@@ -2,7 +2,7 @@ import express, { Request, Response, NextFunction } from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
-import { env } from './config/env.js';
+import { env, isOriginAllowed } from './config/env.js';
 import { db } from './db/client.js';
 import { logger } from './utils/logger.js';
 import { RoomManager } from './domain/room-manager.js';
@@ -19,10 +19,10 @@ export function createApp(customRoomManager?: RoomManager) {
   app.use(
     cors({
       origin: (origin, callback) => {
-        if (!origin || origin === env.CLIENT_ORIGIN || env.NODE_ENV === 'development') {
+        if (isOriginAllowed(origin)) {
           callback(null, true);
         } else {
-          callback(new Error('Blocked by CORS policy'));
+          callback(null, false);
         }
       },
       credentials: true,

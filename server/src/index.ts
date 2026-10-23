@@ -1,7 +1,7 @@
 import http from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 import { app, roomManager } from './app.js';
-import { env } from './config/env.js';
+import { env, isOriginAllowed } from './config/env.js';
 import { logger } from './utils/logger.js';
 import { SocketMessageHandler } from './socket/message-handler.js';
 
@@ -11,10 +11,10 @@ const server = http.createServer(app);
 const io = new SocketIOServer(server, {
   cors: {
     origin: (origin, callback) => {
-      if (!origin || origin === env.CLIENT_ORIGIN || env.NODE_ENV === 'development') {
+      if (isOriginAllowed(origin)) {
         callback(null, true);
       } else {
-        callback(new Error('Blocked by CORS policy'));
+        callback(null, false);
       }
     },
     credentials: true,
