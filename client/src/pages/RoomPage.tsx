@@ -10,6 +10,7 @@ import {
   ConnectingScreen,
   NotFoundScreen,
   RemovedScreen,
+  DisconnectedScreen,
 } from '../components/StatusScreens.js';
 import {
   Tv,
@@ -36,6 +37,7 @@ export const RoomPage: React.FC = () => {
     ownRole,
     participants,
     requests,
+    chatMessages,
     toastMessage,
     joinRoom,
     leaveRoom,
@@ -43,10 +45,36 @@ export const RoomPage: React.FC = () => {
   } = useRoom();
 
   const [activeTab, setActiveTab] = useState<'participants' | 'chat' | 'requests'>('chat');
+  const [unreadChatCount, setUnreadChatCount] = useState<number>(0);
+  const prevChatCountRef = React.useRef<number>(chatMessages.length);
   const [copiedCode, setCopiedCode] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [promptUsername, setPromptUsername] = useState(false);
   const [tempUsername, setTempUsername] = useState('');
+
+  // Track unread chat messages when user is not on the chat tab
+  useEffect(() => {
+    if (activeTab === 'chat') {
+      setUnreadChatCount(0);
+      prevChatCountRef.current = chatMessages.length;
+    } else {
+      const diff = chatMessages.length - prevChatCountRef.current;
+      if (diff > 0) {
+        setUnreadChatCount((prev) => prev + diff);
+      }
+      prevChatCountRef.current = chatMessages.length;
+    }
+  }, [chatMessages, activeTab]);
+
+  // If disconnected or removed, automatically return to landing page
+  useEffect(() => {
+    if (connectionStatus === 'disconnected') {
+      const timer = setTimeout(() => {
+        navigate('/');
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [connectionStatus, navigate]);
 
   // 1. Join room on mount
   useEffect(() => {
@@ -115,6 +143,10 @@ export const RoomPage: React.FC = () => {
   };
 
   // Render status screens
+  if (connectionStatus === 'disconnected') {
+    return <DisconnectedScreen />;
+  }
+
   if (connectionStatus === 'notFound') {
     return <NotFoundScreen />;
   }
@@ -310,8 +342,11 @@ export const RoomPage: React.FC = () => {
               <span>Users ({participants.length})</span>
             </button>
             <button
-              onClick={() => setActiveTab('chat')}
-              className={`py-2 text-xs font-semibold rounded-lg flex items-center justify-center gap-1.5 transition ${
+              onClick={() => {
+                setActiveTab('chat');
+                setUnreadChatCount(0);
+              }}
+              className={`py-2 text-xs font-semibold rounded-lg flex items-center justify-center gap-1.5 transition relative ${
                 activeTab === 'chat'
                   ? 'bg-gradient-to-r from-brand-violet to-brand-pink text-white shadow'
                   : 'text-slate-400 hover:text-slate-200'
@@ -319,6 +354,11 @@ export const RoomPage: React.FC = () => {
             >
               <MessageSquare className="w-3.5 h-3.5" />
               <span>Chat</span>
+              {unreadChatCount > 0 && activeTab !== 'chat' && (
+                <span className="min-w-4 h-4 px-1 rounded-full bg-gradient-to-r from-brand-pink to-rose-500 text-[10px] font-bold text-white flex items-center justify-center shadow">
+                  {unreadChatCount > 99 ? '99+' : unreadChatCount}
+                </span>
+              )}
             </button>
             <button
               onClick={() => setActiveTab('requests')}

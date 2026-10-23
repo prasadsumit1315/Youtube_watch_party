@@ -205,6 +205,7 @@ export const YouTubePlayer: React.FC = () => {
 
   // 2. React to syncState changes from Server
   const currentVideoIdRef = useRef<string>('');
+  const lastServerUpdatedAtRef = useRef<number>(0);
 
   useEffect(() => {
     if (!isPlayerReady || !playerRef.current || !syncState) return;
@@ -236,6 +237,9 @@ export const YouTubePlayer: React.FC = () => {
 
     const clampedExpected = dur > 0 ? Math.min(expectedTime, dur) : expectedTime;
 
+    const isNewServerAction = syncState.updatedAt !== lastServerUpdatedAtRef.current;
+    lastServerUpdatedAtRef.current = syncState.updatedAt;
+
     isProgrammaticAction.current = true;
 
     try {
@@ -243,8 +247,13 @@ export const YouTubePlayer: React.FC = () => {
       const isBuffering = player.getPlayerState?.() === 3;
       const isInitialStartup = playerCurrentTime < 4 && clampedExpected < 6;
 
-      // Avoid seek if buffering or in initial startup seconds to avoid restart loops
-      if (!isBuffering && !isInitialStartup && Math.abs(playerCurrentTime - clampedExpected) > 3.0 && dur > 0 && clampedExpected < dur - 1) {
+      // On explicit server action (seek, play, pause, etc.), execute seek immediately if out of sync
+      if (isNewServerAction) {
+        if (Math.abs(playerCurrentTime - clampedExpected) > 1.5) {
+          player.seekTo(clampedExpected, true);
+          setCurrentPlayTime(clampedExpected);
+        }
+      } else if (!isBuffering && !isInitialStartup && Math.abs(playerCurrentTime - clampedExpected) > 3.0 && dur > 0 && clampedExpected < dur - 1) {
         player.seekTo(clampedExpected, true);
       }
 
@@ -267,12 +276,13 @@ export const YouTubePlayer: React.FC = () => {
     }
   }, [syncState, isPlayerReady, videoDuration]);
 
-  // 3. Drift Correction Loop (every 2s per spec)
+  // 3. Playback time updater & Drift Correction Loop (every 500ms)
   useEffect(() => {
     if (!isPlayerReady || !playerRef.current || !syncState) return;
 
+    let tick = 0;
     const interval = setInterval(() => {
-      if (!playerRef.current || isProgrammaticAction.current) return;
+      if (!playerRef.current) return;
 
       try {
         const player = playerRef.current;
@@ -280,6 +290,10 @@ export const YouTubePlayer: React.FC = () => {
         const dur = player.getDuration?.() || 0;
         setCurrentPlayTime(playerTime);
         if (dur > 0) setVideoDuration(dur);
+
+        // Drift check every 2 seconds (every 4 ticks of 500ms)
+        tick++;
+        if (tick % 4 !== 0 || isProgrammaticAction.current) return;
 
         const isBuffering = player.getPlayerState?.() === 3;
         const s = player.getPlayerState?.();
@@ -310,7 +324,7 @@ export const YouTubePlayer: React.FC = () => {
       } catch {
         // ignore
       }
-    }, 2000);
+    }, 500);
 
     return () => clearInterval(interval);
   }, [isPlayerReady, syncState]);
@@ -347,9 +361,16 @@ export const YouTubePlayer: React.FC = () => {
   // Skip forward 10s
   const handleSkipForward = () => {
     handleUnmuteAudio();
-    const target = Math.min(videoDuration || currentPlayTime + 10, currentPlayTime + 10);
+    const current = (playerRef.current?.getCurrentTime ? playerRef.current.getCurrentTime() : null) ?? currentPlayTime ?? 0;
+    const dur = (playerRef.current?.getDuration ? playerRef.current.getDuration() : null) || videoDuration || 0;
+    const target = dur > 0 ? Math.min(dur, current + 10) : current + 10;
     setCurrentPlayTime(target);
     if (canControl) {
+      try {
+        playerRef.current?.seekTo?.(target, true);
+      } catch {
+        // ignore
+      }
       seek(target);
     } else {
       requestAction('SEEK', target);
@@ -359,9 +380,15 @@ export const YouTubePlayer: React.FC = () => {
   // Skip backward 10s
   const handleSkipBackward = () => {
     handleUnmuteAudio();
-    const target = Math.max(0, currentPlayTime - 10);
+    const current = (playerRef.current?.getCurrentTime ? playerRef.current.getCurrentTime() : null) ?? currentPlayTime ?? 0;
+    const target = Math.max(0, current - 10);
     setCurrentPlayTime(target);
     if (canControl) {
+      try {
+        playerRef.current?.seekTo?.(target, true);
+      } catch {
+        // ignore
+      }
       seek(target);
     } else {
       requestAction('SEEK', target);
@@ -373,6 +400,11 @@ export const YouTubePlayer: React.FC = () => {
     const newTime = parseFloat(e.target.value);
     setCurrentPlayTime(newTime);
     if (canControl) {
+      try {
+        playerRef.current?.seekTo?.(newTime, true);
+      } catch {
+        // ignore
+      }
       seek(newTime);
     }
   };
@@ -648,7 +680,15 @@ export const YouTubePlayer: React.FC = () => {
             {/* Restart from beginning */}
             {canControl && (
               <button
-                onClick={() => seek(0)}
+                onClick={() => {
+                  try {
+                    playerRef.current?.seekTo?.(0, true);
+                    setCurrentPlayTime(0);
+                  } catch {
+                    // ignore
+                  }
+                  seek(0);
+                }}
                 className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 transition"
                 title="Restart from beginning"
                 aria-label="Restart video"
