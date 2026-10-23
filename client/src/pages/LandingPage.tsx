@@ -23,23 +23,11 @@ export const LandingPage: React.FC = () => {
     () => sessionStorage.getItem('wp_username') || ''
   );
   const [isLoading, setIsLoading] = useState(false);
-  const [serverWaking, setServerWaking] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Check backend server status on mount
+  // Quietly ping backend server on mount to wake it up if idle
   useEffect(() => {
-    let timer: NodeJS.Timeout;
-    const probe = async () => {
-      const isUp = await pingServer();
-      if (!isUp) {
-        setServerWaking(true);
-        timer = setTimeout(probe, 4000);
-      } else {
-        setServerWaking(false);
-      }
-    };
-    probe();
-    return () => clearTimeout(timer);
+    pingServer().catch(() => {});
   }, []);
 
   const handleCreateRoom = async (e: React.FormEvent) => {
@@ -131,12 +119,6 @@ export const LandingPage: React.FC = () => {
 
       {/* Main Hero & Forms */}
       <main className="relative z-10 max-w-4xl mx-auto w-full px-6 py-8 flex flex-col items-center">
-        {serverWaking && (
-          <div className="mb-6 px-4 py-2.5 rounded-theme bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center gap-2 shadow-lg animate-fade-in">
-            <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
-            Backend server is spinning up on Render free tier (~20s)...
-          </div>
-        )}
 
         {/* Hero headline */}
         <div className="text-center max-w-2xl mb-10">
