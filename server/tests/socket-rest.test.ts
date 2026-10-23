@@ -243,5 +243,42 @@ describe('Phase 4: REST API & Socket Handler Integration Tests', () => {
       expect(msg.username).toBe('ViewerUser');
       expect(msg.text).toBe('Hello &lt;b&gt;World&lt;/b&gt; &amp; friends!');
     });
+
+    it('client3 joins with exact same username as host, receives PARTICIPANT role while host remains HOST', async () => {
+      const client3 = Client(`http://127.0.0.1:${port}`, {
+        transports: ['websocket'],
+      });
+
+      await new Promise<void>((resolve) => {
+        client3.on('connect', () => resolve());
+      });
+
+      const syncPromise = new Promise<any>((resolve) => {
+        client3.on('sync_state', (state) => resolve(state));
+      });
+
+      // Join with exact same username as client1 ('HostGuy')
+      client3.emit('join_room', {
+        roomId: testRoomId,
+        username: 'HostGuy',
+      });
+
+      const syncState = await syncPromise;
+      expect(syncState.ownRole).toBe(Role.PARTICIPANT);
+      expect(syncState.participants.length).toBe(3);
+
+      // Verify that host is still in participants and is still HOST
+      const hostP = syncState.participants.find((p: any) => p.role === Role.HOST);
+      expect(hostP).toBeDefined();
+      expect(hostP.username).toBe('HostGuy');
+
+      // Verify client3 is also in participants as PARTICIPANT
+      const viewerP = syncState.participants.find((p: any) => p.userId === syncState.ownUserId);
+      expect(viewerP).toBeDefined();
+      expect(viewerP.role).toBe(Role.PARTICIPANT);
+      expect(viewerP.username).toBe('HostGuy');
+
+      client3.disconnect();
+    });
   });
 });

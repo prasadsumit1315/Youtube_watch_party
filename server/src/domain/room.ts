@@ -61,16 +61,6 @@ export class Room {
   // --- Participants Management ---
 
   addParticipant(participant: Participant): void {
-    // Prevent duplicate participants with the same username
-    for (const [id, p] of this.participants.entries()) {
-      if (p.username.toLowerCase() === participant.username.toLowerCase() && id !== participant.userId) {
-        if (p.role === Role.HOST || this.hostUserId === id) {
-          participant.role = Role.HOST;
-          this.hostUserId = participant.userId;
-        }
-        this.participants.delete(id);
-      }
-    }
     this.participants.set(participant.userId, participant);
     this.emptySince = null;
     this.touch();

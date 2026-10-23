@@ -52,6 +52,13 @@ export const RoomPage: React.FC = () => {
   useEffect(() => {
     if (!id) return;
 
+    const currentRoom = sessionStorage.getItem('wp_current_room');
+    if (currentRoom && currentRoom !== id) {
+      sessionStorage.removeItem('wp_user_id');
+      sessionStorage.removeItem('wp_reconnect_token');
+    }
+    sessionStorage.setItem('wp_current_room', id);
+
     const savedUsername = sessionStorage.getItem('wp_username');
     if (savedUsername) {
       joinRoom(id, savedUsername);
@@ -67,6 +74,8 @@ export const RoomPage: React.FC = () => {
   const handleUsernameSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!tempUsername.trim() || !id) return;
+    sessionStorage.removeItem('wp_user_id');
+    sessionStorage.removeItem('wp_reconnect_token');
     sessionStorage.setItem('wp_username', tempUsername.trim());
     joinRoom(id, tempUsername.trim());
     setPromptUsername(false);

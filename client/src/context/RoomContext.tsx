@@ -149,9 +149,8 @@ export const RoomProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const seen = new Set<string>();
         const deduped: PublicParticipant[] = [];
         for (const p of data.participants) {
-          const key = p.username.toLowerCase();
-          if (!seen.has(key)) {
-            seen.add(key);
+          if (!seen.has(p.userId)) {
+            seen.add(p.userId);
             deduped.push(p);
           }
         }
@@ -171,9 +170,7 @@ export const RoomProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const handleUserJoined = (data: { user: PublicParticipant }) => {
       setParticipants((prev) => {
-        const filtered = prev.filter(
-          (p) => p.userId !== data.user.userId && p.username.toLowerCase() !== data.user.username.toLowerCase()
-        );
+        const filtered = prev.filter((p) => p.userId !== data.user.userId);
         return [...filtered, data.user];
       });
       showToast(`${data.user.username} joined the room`);

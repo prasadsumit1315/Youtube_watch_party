@@ -231,6 +231,34 @@ describe('Phase 3: Domain Classes & PermissionPolicy Unit Tests', () => {
       expect(host.role).toBe(Role.MODERATOR); // Old host demoted to MODERATOR
     });
 
+    it('preserves both participants and keeps host role intact when a viewer has the same username as host', () => {
+      const room = new Room({
+        id: 'r-same-name',
+        code: 'SAMENAME',
+        hostUserId: 'host-1',
+      });
+      const host = new Participant({
+        userId: 'host-1',
+        username: 'Sumit',
+        role: Role.HOST,
+        socketId: 'sock-host',
+      });
+      const viewer = new Participant({
+        userId: 'viewer-2',
+        username: 'Sumit',
+        role: Role.PARTICIPANT,
+        socketId: 'sock-viewer',
+      });
+
+      room.addParticipant(host);
+      room.addParticipant(viewer);
+
+      expect(room.getParticipantCount()).toBe(2);
+      expect(room.hostUserId).toBe('host-1');
+      expect(room.getParticipant('host-1')?.role).toBe(Role.HOST);
+      expect(room.getParticipant('viewer-2')?.role).toBe(Role.PARTICIPANT);
+    });
+
     it('enforces bans and removes banned participants', () => {
       const room = new Room({
         id: 'r-1',

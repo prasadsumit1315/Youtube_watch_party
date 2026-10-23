@@ -132,12 +132,27 @@ export class SocketMessageHandler {
           let participant: Participant | undefined;
           let isReconnect = false;
 
-          // 1. Check if participant already exists by socket, token, or userId
+          // Check if the current room host is already actively connected on a socket
+          const activeHost = room.getParticipant(room.hostUserId);
+          const isHostActive = Boolean(
+            activeHost &&
+            activeHost.socketId !== socket.id &&
+            this.io.sockets.sockets.get(activeHost.socketId)?.connected
+          );
+
+          // 1. Check if participant already exists by token, userId, or socketId
+          // Never allow stealing or reconnecting as HOST if the host socket is currently active
           if (!participant && reconnectToken) {
-            participant = room.getParticipantByReconnectToken(reconnectToken);
+            const found = room.getParticipantByReconnectToken(reconnectToken);
+            if (found && !(found.role === Role.HOST && isHostActive)) {
+              participant = found;
+            }
           }
           if (!participant && incomingUserId) {
-            participant = room.getParticipant(incomingUserId);
+            const found = room.getParticipant(incomingUserId);
+            if (found && !(found.role === Role.HOST && isHostActive)) {
+              participant = found;
+            }
           }
           if (!participant) {
             participant = room.getParticipantBySocketId(socket.id);
@@ -150,20 +165,34 @@ export class SocketMessageHandler {
           }
 
           if (!participant) {
-            const userId = incomingUserId || randomUUID();
-
             // Check if user is banned (in-memory fast check)
-            if (room.isBanned(userId)) {
+            if (incomingUserId && room.isBanned(incomingUserId)) {
               socket.emit('removed', { message: 'You have been removed from this room' });
               socket.disconnect(true);
               return;
             }
 
-            // The first user joining an empty room or matching hostUserId becomes HOST
+            // Determine role:
+            // Only assign Role.HOST if no active host is currently connected in the room AND:
+            // - incomingUserId matches room.hostUserId, OR
+            // - room currently has 0 participants and no active host is registered
             let role: Role = Role.PARTICIPANT;
-            if (room.getParticipantCount() === 0 || room.hostUserId === userId) {
-              role = Role.HOST;
-              room.hostUserId = userId;
+            let userId: string = randomUUID();
+
+            if (!isHostActive) {
+              if (incomingUserId && incomingUserId === room.hostUserId) {
+                userId = incomingUserId;
+                role = Role.HOST;
+              } else if (room.getParticipantCount() === 0 && !activeHost) {
+                role = Role.HOST;
+                room.hostUserId = userId;
+              }
+            }
+
+            if (room.isBanned(userId)) {
+              socket.emit('removed', { message: 'You have been removed from this room' });
+              socket.disconnect(true);
+              return;
             }
 
             participant = new Participant({

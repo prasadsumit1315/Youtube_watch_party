@@ -49,6 +49,7 @@ export const LandingPage: React.FC = () => {
       if (res.hostUserId) {
         sessionStorage.setItem('wp_user_id', res.hostUserId);
       }
+      sessionStorage.setItem('wp_current_room', res.roomId);
       navigate(`/room/${res.roomId}`);
     } catch (err) {
       setErrorMessage((err as Error).message || 'Failed to create room');
@@ -94,6 +95,7 @@ export const LandingPage: React.FC = () => {
       sessionStorage.removeItem('wp_user_id');
       sessionStorage.removeItem('wp_reconnect_token');
       sessionStorage.setItem('wp_username', trimmedName);
+      sessionStorage.setItem('wp_current_room', targetCode);
       navigate(`/room/${targetCode}`);
     } catch (err) {
       setErrorMessage('Failed to verify room');
