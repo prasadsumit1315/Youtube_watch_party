@@ -78,6 +78,7 @@ export const YouTubePlayer: React.FC = () => {
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState<number>(1);
   const [currentQuality, setCurrentQuality] = useState<string>('auto');
+  const [showMobilePlayOverlay, setShowMobilePlayOverlay] = useState<boolean>(false);
 
   const canControl = ownRole === 'HOST' || ownRole === 'MODERATOR';
 
@@ -130,9 +131,26 @@ export const YouTubePlayer: React.FC = () => {
             // Attempt to start video
             if (syncState?.playState === 'PLAYING') {
               event.target.playVideo();
+              // Check if browser blocked autoplay (e.g. mobile Safari/Chrome)
+              setTimeout(() => {
+                try {
+                  const s = event.target.getPlayerState();
+                  if (s !== window.YT.PlayerState.PLAYING && s !== window.YT.PlayerState.BUFFERING) {
+                    setShowMobilePlayOverlay(true);
+                  }
+                } catch {
+                  setShowMobilePlayOverlay(true);
+                }
+              }, 1200);
             }
           },
           onStateChange: (event: any) => {
+            const state = event.data;
+
+            if (state === window.YT.PlayerState.PLAYING) {
+              setShowMobilePlayOverlay(false);
+            }
+
             // Track audio mute status
             try {
               if (playerRef.current?.isMuted) {
@@ -148,15 +166,15 @@ export const YouTubePlayer: React.FC = () => {
             }
 
             const now = Date.now();
-            if (now - lastStateChangeTime.current < 400) return; // Debounce
+            if (now - lastStateChangeTime.current < 500) return; // Debounce
             lastStateChangeTime.current = now;
 
             const playerTime = playerRef.current?.getCurrentTime() || 0;
-            if (event.data === window.YT.PlayerState.PLAYING) {
+            if (state === window.YT.PlayerState.PLAYING) {
               if (canControl && syncState?.playState !== 'PLAYING') {
                 play(playerTime);
               }
-            } else if (event.data === window.YT.PlayerState.PAUSED) {
+            } else if (state === window.YT.PlayerState.PAUSED) {
               if (canControl && syncState?.playState !== 'PAUSED') {
                 pause(playerTime);
               }
@@ -222,20 +240,30 @@ export const YouTubePlayer: React.FC = () => {
 
     try {
       const playerCurrentTime = player.getCurrentTime?.() || 0;
-      // Seek only if difference is significant (> 2.5s) to avoid restart jitter on play
-      if (Math.abs(playerCurrentTime - clampedExpected) > 2.5 && dur > 0 && clampedExpected < dur - 1) {
+      const isBuffering = player.getPlayerState?.() === 3;
+      const isInitialStartup = playerCurrentTime < 4 && clampedExpected < 6;
+
+      // Avoid seek if buffering or in initial startup seconds to avoid restart loops
+      if (!isBuffering && !isInitialStartup && Math.abs(playerCurrentTime - clampedExpected) > 3.0 && dur > 0 && clampedExpected < dur - 1) {
         player.seekTo(clampedExpected, true);
       }
 
       if (syncState.playState === 'PLAYING') {
         player.playVideo();
+        setTimeout(() => {
+          const s = player.getPlayerState?.();
+          if (s !== 1 && s !== 3) {
+            setShowMobilePlayOverlay(true);
+          }
+        }, 1200);
       } else {
         player.pauseVideo();
+        setShowMobilePlayOverlay(false);
       }
     } finally {
       setTimeout(() => {
         isProgrammaticAction.current = false;
-      }, 500);
+      }, 600);
     }
   }, [syncState, isPlayerReady, videoDuration]);
 
@@ -253,6 +281,11 @@ export const YouTubePlayer: React.FC = () => {
         setCurrentPlayTime(playerTime);
         if (dur > 0) setVideoDuration(dur);
 
+        const isBuffering = player.getPlayerState?.() === 3;
+        const s = player.getPlayerState?.();
+        // If buffering or paused, do not force seek
+        if (isBuffering || s === 2) return;
+
         // Expected playback timestamp clamped to valid duration
         const now = Date.now();
         const expectedTime =
@@ -262,15 +295,17 @@ export const YouTubePlayer: React.FC = () => {
 
         const clampedExpected = dur > 0 ? Math.min(expectedTime, dur) : expectedTime;
 
-        // SPEC: "Drift correction every 2s: if |player time - expected| > 1.5s, seek"
-        // Use 2.5s buffer and guard against seeking past end to prevent looping restarts
+        // In first 4 seconds, allow smooth initial buffering
+        if (playerTime < 4 && clampedExpected < 6) return;
+
+        // Smooth drift correction with 3s buffer to prevent looping restarts
         const drift = Math.abs(playerTime - clampedExpected);
-        if (drift > 2.5 && dur > 0 && clampedExpected < dur - 1) {
+        if (drift > 3.0 && dur > 0 && clampedExpected < dur - 1) {
           isProgrammaticAction.current = true;
           player.seekTo(clampedExpected, true);
           setTimeout(() => {
             isProgrammaticAction.current = false;
-          }, 600);
+          }, 800);
         }
       } catch {
         // ignore
@@ -449,6 +484,21 @@ export const YouTubePlayer: React.FC = () => {
     setShowChangeVideoModal(false);
   };
 
+  const handleDirectUserPlay = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (playerRef.current) {
+      try {
+        playerRef.current.unMute();
+        playerRef.current.setVolume(100);
+        playerRef.current.playVideo();
+        handleSyncToLive();
+      } catch {
+        // ignore
+      }
+    }
+    setShowMobilePlayOverlay(false);
+  };
+
   const formatTime = (seconds: number) => {
     const s = Math.floor(seconds || 0);
     const m = Math.floor(s / 60);
@@ -457,15 +507,36 @@ export const YouTubePlayer: React.FC = () => {
   };
 
   return (
-    <div ref={playerWrapperRef} className="flex flex-col w-full h-full bg-brand-darkBg">
+    <div ref={playerWrapperRef} className="flex flex-col w-full h-full bg-brand-darkBg relative">
+      {/* Cinematic Ambilight Backlight Glow */}
+      <div className="absolute -inset-1 sm:-inset-3 rounded-3xl bg-gradient-to-r from-rose-600/15 via-purple-600/10 to-amber-600/15 blur-2xl opacity-60 pointer-events-none" />
+
       {/* 16:9 Video Canvas Container (Clean Screen: ZERO controls inside video area) */}
       <div
         onClick={handleTogglePlay}
-        className="relative w-full aspect-video min-h-[280px] sm:min-h-[440px] bg-black rounded-theme overflow-hidden border border-brand-border shadow-2xl flex items-center justify-center cursor-pointer select-none"
+        className="relative w-full aspect-video min-h-[220px] sm:min-h-[440px] bg-black rounded-theme overflow-hidden border border-brand-border/60 shadow-2xl flex items-center justify-center cursor-pointer select-none"
         title={canControl ? 'Click to Play / Pause' : undefined}
       >
         {/* The YouTube iframe container (100% width and 100% height, pointer-events-none to prevent YouTube on-screen UI) */}
         <div ref={playerContainerRef} className="w-full h-full relative pointer-events-none" />
+
+        {/* Mobile / Autoplay Bypass Tap Overlay */}
+        {showMobilePlayOverlay && syncState?.videoId && (
+          <div
+            onClick={handleDirectUserPlay}
+            className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm p-4 text-center cursor-pointer animate-fade-in"
+          >
+            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-tr from-rose-500 to-amber-500 flex items-center justify-center shadow-[0_0_40px_rgba(244,63,94,0.6)] animate-pulse mb-3 hover:scale-105 transition">
+              <Play className="w-8 h-8 sm:w-10 sm:h-10 text-white fill-current ml-1" />
+            </div>
+            <p className="text-white text-base sm:text-lg font-bold tracking-wide">
+              Tap to Start Watching
+            </p>
+            <p className="text-slate-300 text-xs mt-1">
+              Mobile browsers require one tap to enable sound & sync
+            </p>
+          </div>
+        )}
 
         {/* Empty state when no video is loaded */}
         {!syncState?.videoId && (

@@ -23,6 +23,7 @@ import {
   Shield,
   Eye,
   X,
+  Share2,
 } from 'lucide-react';
 
 export const RoomPage: React.FC = () => {
@@ -42,6 +43,7 @@ export const RoomPage: React.FC = () => {
   } = useRoom();
 
   const [activeTab, setActiveTab] = useState<'participants' | 'chat' | 'requests'>('chat');
+  const [copiedCode, setCopiedCode] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [promptUsername, setPromptUsername] = useState(false);
   const [tempUsername, setTempUsername] = useState('');
@@ -70,8 +72,29 @@ export const RoomPage: React.FC = () => {
     setPromptUsername(false);
   };
 
-  const handleCopyInviteLink = () => {
+  // Copies ONLY the room code
+  const handleCopyRoomCode = () => {
+    const code = syncState?.roomCode || id || '';
+    navigator.clipboard.writeText(code);
+    setCopiedCode(true);
+    setTimeout(() => setCopiedCode(false), 2000);
+  };
+
+  // Shares or copies the full invite URL
+  const handleShareLink = async () => {
     const inviteUrl = window.location.href;
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'WatchParty Cinema - Watch Together',
+          text: `Join my WatchParty screening! Room code: ${syncState?.roomCode || id}`,
+          url: inviteUrl,
+        });
+        return;
+      } catch {
+        // Fall back to clipboard if user cancels or share is dismissed
+      }
+    }
     navigator.clipboard.writeText(inviteUrl);
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 2000);
@@ -191,31 +214,54 @@ export const RoomPage: React.FC = () => {
 
           <div className="h-5 w-px bg-white/10 mx-1 hidden sm:block" />
 
-          {/* Room Code chip */}
-          <div className="flex items-center gap-2 bg-white/5 border border-white/10 px-3 py-1 rounded-full">
-            <span className="text-[11px] uppercase tracking-wider text-slate-400">
-              Room
+          {/* Room Code Chip - Copies ONLY Code */}
+          <div className="flex items-center gap-1.5 bg-white/5 border border-white/10 px-3 py-1.5 rounded-full">
+            <span className="text-[10px] uppercase tracking-wider font-semibold text-slate-400">
+              Code:
             </span>
-            <span className="font-mono text-xs font-bold text-slate-200">
+            <span className="font-mono text-xs font-bold text-amber-300">
               {syncState?.roomCode || id}
             </span>
             <button
-              onClick={handleCopyInviteLink}
-              className="ml-1 p-1 rounded-full hover:bg-white/10 text-slate-400 hover:text-white transition"
-              title="Copy invite link"
-              aria-label="Copy invite link"
+              onClick={handleCopyRoomCode}
+              className="ml-1 p-1 rounded-full hover:bg-white/15 text-slate-300 hover:text-white transition flex items-center gap-1"
+              title="Copy Room Code Only"
+              aria-label="Copy Room Code Only"
             >
-              {copiedLink ? (
-                <Check className="w-3 h-3 text-emerald-400" />
+              {copiedCode ? (
+                <>
+                  <Check className="w-3 h-3 text-emerald-400" />
+                  <span className="text-[10px] text-emerald-400 font-semibold hidden md:inline">Copied!</span>
+                </>
               ) : (
                 <Copy className="w-3 h-3" />
               )}
             </button>
           </div>
+
+          {/* Dedicated Share Link Button */}
+          <button
+            onClick={handleShareLink}
+            className="px-3 py-1.5 rounded-full bg-gradient-to-r from-rose-500 to-amber-500 hover:opacity-90 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md active:scale-95 transition"
+            title="Share or Copy Room Link"
+            aria-label="Share or Copy Room Link"
+          >
+            {copiedLink ? (
+              <>
+                <Check className="w-3.5 h-3.5 text-white" />
+                <span>Link Copied!</span>
+              </>
+            ) : (
+              <>
+                <Share2 className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Share Link</span>
+              </>
+            )}
+          </button>
         </div>
 
         {/* Right header controls */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           {getRoleBadge()}
 
           <button
@@ -230,7 +276,7 @@ export const RoomPage: React.FC = () => {
       </header>
 
       {/* Main Room Layout */}
-      <main className="flex-1 flex flex-col lg:flex-row p-3 sm:p-4 gap-4 max-w-[1700px] w-full mx-auto overflow-hidden">
+      <main className="flex-1 flex flex-col lg:flex-row p-2.5 sm:p-4 gap-4 max-w-[1700px] w-full mx-auto overflow-y-auto lg:overflow-hidden">
         {/* Left Column: Player & Reactions (approx 70%) */}
         <section className="flex-1 flex flex-col relative min-w-0">
           <div className="relative flex-1 flex flex-col">

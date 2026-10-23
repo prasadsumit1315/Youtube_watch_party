@@ -15,7 +15,7 @@ export async function pingServer(): Promise<boolean> {
 export async function createRoom(
   hostUsername?: string,
   initialVideoUrl?: string
-): Promise<{ roomId: string }> {
+): Promise<{ roomId: string; hostUserId?: string }> {
   const res = await fetch(`${SERVER_URL}/api/rooms`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

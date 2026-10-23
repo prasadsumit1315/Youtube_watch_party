@@ -32,9 +32,9 @@ export function createRoomsRouter(roomManager: RoomManager): Router {
       const hostUserId = randomUUID();
       const room = await roomManager.createRoom(hostUserId, hostUsername, videoId);
 
-      // SPEC: { roomId } only
       return res.status(201).json({
         roomId: room.id,
+        hostUserId,
       });
     } catch (err) {
       logger.error({ error: (err as Error).message }, 'Failed to create room endpoint');

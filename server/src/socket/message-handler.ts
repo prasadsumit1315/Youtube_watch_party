@@ -143,16 +143,6 @@ export class SocketMessageHandler {
             participant = room.getParticipantBySocketId(socket.id);
           }
 
-          // 2. If not found, match any existing participant with the same username
-          if (!participant) {
-            for (const p of room.getParticipantsPublic()) {
-              if (p.username.toLowerCase() === username.toLowerCase()) {
-                participant = room.getParticipant(p.userId);
-                break;
-              }
-            }
-          }
-
           if (participant) {
             isReconnect = true;
             participant.updateSocket(socket.id);
@@ -169,11 +159,9 @@ export class SocketMessageHandler {
               return;
             }
 
-            // If room has no active host currently connected or 0 participants, this user becomes HOST
+            // The first user joining an empty room or matching hostUserId becomes HOST
             let role: Role = Role.PARTICIPANT;
-            const activeHost = room.getParticipant(room.hostUserId);
-            const isHostActive = activeHost && this.io.sockets.sockets.get(activeHost.socketId)?.connected;
-            if (!isHostActive || room.getParticipantCount() === 0 || room.hostUserId === userId) {
+            if (room.getParticipantCount() === 0 || room.hostUserId === userId) {
               role = Role.HOST;
               room.hostUserId = userId;
             }

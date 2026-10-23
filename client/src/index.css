@@ -55,9 +55,35 @@ body {
 }
 
 .gradient-text {
-  background: linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%);
+  background: linear-gradient(135deg, #F43F5E 0%, #FB923C 50%, #EC4899 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
+}
+
+.cinema-glow {
+  box-shadow: 0 0 50px -10px rgba(244, 63, 94, 0.25), 0 0 100px -20px rgba(139, 92, 246, 0.2);
+}
+
+.cinema-card {
+  background: linear-gradient(180deg, rgba(26, 29, 45, 0.8) 0%, rgba(15, 17, 28, 0.95) 100%);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.cinema-card:hover {
+  border-color: rgba(244, 63, 94, 0.4);
+  transform: translateY(-3px);
+  box-shadow: 0 12px 36px -8px rgba(0, 0, 0, 0.6), 0 0 25px rgba(244, 63, 94, 0.2);
+}
+
+.movie-badge {
+  background: linear-gradient(90deg, rgba(244, 63, 94, 0.15) 0%, rgba(251, 146, 60, 0.15) 100%);
+  border: 1px solid rgba(244, 63, 94, 0.3);
+  color: #FDA4AF;
 }
 
 /* Force YouTube Player IFrame to fill 100% of container */

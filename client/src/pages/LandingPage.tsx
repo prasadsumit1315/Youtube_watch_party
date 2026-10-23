@@ -3,11 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { createRoom, checkRoomExists, pingServer } from '../services/api.js';
 import {
   Tv,
-  Users,
   Sparkles,
   ArrowRight,
   Shield,
-  PlayCircle,
+  Film,
+  Clapperboard,
+  Crown,
+  Heart,
+  Flame,
 } from 'lucide-react';
 
 export const LandingPage: React.FC = () => {
@@ -43,6 +46,9 @@ export const LandingPage: React.FC = () => {
       setIsLoading(true);
       sessionStorage.setItem('wp_username', trimmedName);
       const res = await createRoom(trimmedName, videoUrl.trim() || undefined);
+      if (res.hostUserId) {
+        sessionStorage.setItem('wp_user_id', res.hostUserId);
+      }
       navigate(`/room/${res.roomId}`);
     } catch (err) {
       setErrorMessage((err as Error).message || 'Failed to create room');
@@ -85,6 +91,8 @@ export const LandingPage: React.FC = () => {
         return;
       }
 
+      sessionStorage.removeItem('wp_user_id');
+      sessionStorage.removeItem('wp_reconnect_token');
       sessionStorage.setItem('wp_username', trimmedName);
       navigate(`/room/${targetCode}`);
     } catch (err) {
@@ -258,42 +266,90 @@ export const LandingPage: React.FC = () => {
           )}
         </div>
 
-        {/* Feature Highlights Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-12 w-full">
-          <div className="glass-card p-5">
-            <div className="w-8 h-8 rounded-lg bg-pink-500/10 text-pink-400 flex items-center justify-center mb-3">
-              <PlayCircle className="w-4 h-4" />
+        {/* Movie Genres Marquee strip */}
+        <div className="flex flex-wrap items-center justify-center gap-2 mt-8 mb-4 max-w-xl text-center">
+          {['🎬 Movie Nights', '🍿 Binge Shows', '🚀 Anime & Sci-Fi', '🎵 Music Concerts', '🎮 Gaming Streams'].map((genre) => (
+            <span
+              key={genre}
+              className="px-3 py-1 rounded-full text-[11px] font-medium bg-white/[0.04] border border-white/[0.08] text-slate-300 hover:border-brand-pink/40 hover:text-white transition cursor-default"
+            >
+              {genre}
+            </span>
+          ))}
+        </div>
+
+        {/* Feature Highlights Grid - Cinematic Movie Style */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mt-10 w-full">
+          {/* Card 1: Synchronized Playback */}
+          <div className="cinema-card p-6 flex flex-col justify-between group">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-rose-500/10 rounded-full blur-2xl group-hover:bg-rose-500/20 transition duration-500" />
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <div className="w-11 h-11 rounded-xl bg-gradient-to-tr from-rose-500/20 to-amber-500/20 border border-rose-500/30 text-rose-400 flex items-center justify-center shadow-lg group-hover:scale-105 transition">
+                  <Film className="w-5 h-5 text-rose-400" />
+                </div>
+                <span className="movie-badge px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase">
+                  Zero Drift
+                </span>
+              </div>
+              <h3 className="text-base font-bold text-slate-100 mb-2 flex items-center gap-2">
+                Cinematic Sync
+              </h3>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Sub-second drift correction continuously realigns player timestamps for every viewer. Every scene, punchline, and climax happens together.
+              </p>
             </div>
-            <h3 className="text-sm font-semibold text-slate-200 mb-1">
-              Synchronized Playback
-            </h3>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              Sub-second drift correction continuously aligns player timestamps for all viewers.
-            </p>
+            <div className="mt-5 pt-4 border-t border-white/5 flex items-center gap-1.5 text-[11px] font-semibold text-rose-400">
+              <Clapperboard className="w-3.5 h-3.5" /> Theater-Grade Precision
+            </div>
           </div>
 
-          <div className="glass-card p-5">
-            <div className="w-8 h-8 rounded-lg bg-violet-500/10 text-violet-400 flex items-center justify-center mb-3">
-              <Shield className="w-4 h-4" />
+          {/* Card 2: Role-Based Control */}
+          <div className="cinema-card p-6 flex flex-col justify-between group">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 rounded-full blur-2xl group-hover:bg-amber-500/20 transition duration-500" />
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <div className="w-11 h-11 rounded-xl bg-gradient-to-tr from-amber-500/20 to-purple-500/20 border border-amber-500/30 text-amber-400 flex items-center justify-center shadow-lg group-hover:scale-105 transition">
+                  <Crown className="w-5 h-5 text-amber-400" />
+                </div>
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase bg-amber-500/10 border border-amber-500/30 text-amber-300">
+                  Director RBAC
+                </span>
+              </div>
+              <h3 className="text-base font-bold text-slate-100 mb-2 flex items-center gap-2">
+                Director Controls
+              </h3>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                The Host commands playback from the director's chair. Promote friends to Co-Directors, approve video change requests, and ban trolls instantly.
+              </p>
             </div>
-            <h3 className="text-sm font-semibold text-slate-200 mb-1">
-              Role-Based Control
-            </h3>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              Host and Moderators maintain control while participants request actions politely.
-            </p>
+            <div className="mt-5 pt-4 border-t border-white/5 flex items-center gap-1.5 text-[11px] font-semibold text-amber-400">
+              <Shield className="w-3.5 h-3.5" /> Zero-Trust Security
+            </div>
           </div>
 
-          <div className="glass-card p-5">
-            <div className="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-400 flex items-center justify-center mb-3">
-              <Users className="w-4 h-4" />
+          {/* Card 3: Live Balcony & Reactions */}
+          <div className="cinema-card p-6 flex flex-col justify-between group">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-pink-500/10 rounded-full blur-2xl group-hover:bg-pink-500/20 transition duration-500" />
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <div className="w-11 h-11 rounded-xl bg-gradient-to-tr from-pink-500/20 to-violet-500/20 border border-pink-500/30 text-pink-400 flex items-center justify-center shadow-lg group-hover:scale-105 transition">
+                  <Flame className="w-5 h-5 text-pink-400" />
+                </div>
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase bg-pink-500/10 border border-pink-500/30 text-pink-300">
+                  Live Reactions
+                </span>
+              </div>
+              <h3 className="text-base font-bold text-slate-100 mb-2 flex items-center gap-2">
+                Balcony Chat
+              </h3>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Hype up the screening with floating animated emojis over the theater screen, popcorn reactions, and fast sanitized chat room.
+              </p>
             </div>
-            <h3 className="text-sm font-semibold text-slate-200 mb-1">
-              Chat & Reactions
-            </h3>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              Lightweight real-time chat and floating emoji reactions overlaying the stream.
-            </p>
+            <div className="mt-5 pt-4 border-t border-white/5 flex items-center gap-1.5 text-[11px] font-semibold text-pink-400">
+              <Heart className="w-3.5 h-3.5" /> Interactive Theater Room
+            </div>
           </div>
         </div>
       </main>
