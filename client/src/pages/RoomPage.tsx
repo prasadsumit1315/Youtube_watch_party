@@ -68,12 +68,12 @@ export const RoomPage: React.FC = () => {
     }
   }, [chatMessages, activeTab]);
 
-  // If disconnected or removed, automatically return to landing page
+  // Only redirect if explicitly removed/banned by host
   useEffect(() => {
-    if (connectionStatus === 'disconnected') {
+    if (connectionStatus === 'removed') {
       const timer = setTimeout(() => {
         navigate('/');
-      }, 1500);
+      }, 2500);
       return () => clearTimeout(timer);
     }
   }, [connectionStatus, navigate]);
@@ -90,8 +90,9 @@ export const RoomPage: React.FC = () => {
     sessionStorage.setItem('wp_current_room', id);
 
     const savedUsername = sessionStorage.getItem('wp_username');
+    const savedAvatar = sessionStorage.getItem('wp_avatar') || undefined;
     if (savedUsername) {
-      joinRoom(id, savedUsername);
+      joinRoom(id, savedUsername, savedAvatar);
     } else {
       setPromptUsername(true);
     }
@@ -146,10 +147,6 @@ export const RoomPage: React.FC = () => {
   };
 
   // Render status screens
-  if (connectionStatus === 'disconnected') {
-    return <DisconnectedScreen />;
-  }
-
   if (connectionStatus === 'notFound') {
     return <NotFoundScreen />;
   }
@@ -164,6 +161,10 @@ export const RoomPage: React.FC = () => {
 
   if (connectionStatus === 'connecting' && !syncState) {
     return <ConnectingScreen />;
+  }
+
+  if (connectionStatus === 'disconnected' && !syncState) {
+    return <DisconnectedScreen />;
   }
 
   // Username modal if joiner arrived directly via invite link without a saved username
@@ -223,50 +224,36 @@ export const RoomPage: React.FC = () => {
       case 'PARTICIPANT':
       default:
         return (
-          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-slate-800 text-slate-300 border border-slate-700">
-            <Eye className="w-3.5 h-3.5" /> Participant
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-slate-800 text-slate-400 border border-slate-700">
+            <Eye className="w-3.5 h-3.5" /> Viewer
           </span>
         );
     }
   };
 
   return (
-    <div className="min-h-screen bg-brand-darkBg flex flex-col text-slate-100">
-      {/* Toast notifications */}
-      {toastMessage && (
-        <div className="fixed top-20 right-6 z-50 flex items-center gap-2 px-4 py-2.5 glass-panel border border-brand-border text-xs text-slate-200 shadow-2xl animate-fade-in">
-          <span>{toastMessage}</span>
-          <button
-            onClick={clearToast}
-            className="text-slate-400 hover:text-white p-0.5"
-            aria-label="Dismiss toast"
-          >
-            <X className="w-3 h-3" />
-          </button>
-        </div>
-      )}
-
-      {/* Top Bar */}
-      <header className="h-16 border-b border-white/10 px-4 sm:px-6 flex items-center justify-between bg-brand-darkSurface/60 backdrop-blur-md sticky top-0 z-40">
+    <div className="min-h-screen bg-brand-darkBg text-slate-100 flex flex-col">
+      {/* Top Navigation Bar */}
+      <header className="h-16 border-b border-brand-border/60 px-4 sm:px-6 flex items-center justify-between bg-brand-darkBg/95 backdrop-blur-md sticky top-0 z-40">
         <div className="flex items-center gap-3">
           <div
             onClick={() => navigate('/')}
-            className="flex items-center gap-2 cursor-pointer"
+            className="flex items-center gap-2 cursor-pointer group"
           >
             <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-brand-violet to-brand-pink flex items-center justify-center shadow">
               <Tv className="w-4 h-4 text-white" />
             </div>
-            <span className="font-bold text-base tracking-tight gradient-text hidden sm:inline">
+            <span className="font-bold text-base gradient-text hidden sm:inline">
               WatchParty
             </span>
           </div>
 
-          <div className="h-5 w-px bg-white/10 mx-1 hidden sm:block" />
+          <div className="h-4 w-px bg-white/10 mx-1 hidden sm:block" />
 
-          {/* Room Code Chip - Copies ONLY Code */}
+          {/* Room Code Badge */}
           <div className="flex items-center gap-1.5 bg-white/5 border border-white/10 px-3 py-1.5 rounded-full">
-            <span className="text-[10px] uppercase tracking-wider font-semibold text-slate-400">
-              Code:
+            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+              Room:
             </span>
             <span className="font-mono text-xs font-bold text-amber-300">
               {syncState?.roomCode || id}
@@ -307,6 +294,39 @@ export const RoomPage: React.FC = () => {
               </>
             )}
           </button>
+
+          {/* Watchers Profile Photos Facepile */}
+          {participants.length > 0 && (
+            <div
+              className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/5 border border-white/10"
+              title="Watchers currently in room"
+            >
+              <div className="flex items-center -space-x-2">
+                {participants.slice(0, 5).map((p) => (
+                  <div
+                    key={p.userId}
+                    title={`${p.username} (${p.role})`}
+                    className="w-7 h-7 rounded-full border-2 border-brand-darkBg bg-brand-darkSurface overflow-hidden flex items-center justify-center text-xs shadow shrink-0"
+                  >
+                    {p.avatar ? (
+                      p.avatar.startsWith('data:image/') ? (
+                        <img src={p.avatar} alt={p.username} className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-sm select-none">{p.avatar}</span>
+                      )
+                    ) : (
+                      <span className="font-bold text-[9px] text-white bg-gradient-to-tr from-brand-violet to-brand-pink w-full h-full flex items-center justify-center">
+                        {p.username.slice(0, 2).toUpperCase()}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <span className="text-[11px] font-semibold text-slate-300 ml-1">
+                {participants.length} watching
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Right header controls */}
@@ -333,6 +353,14 @@ export const RoomPage: React.FC = () => {
         </div>
       </header>
 
+      {/* Reconnecting banner if temporary network drop occurs */}
+      {connectionStatus === 'disconnected' && syncState && (
+        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full bg-amber-500/95 text-slate-900 text-xs font-bold shadow-2xl backdrop-blur-md flex items-center gap-2 animate-bounce">
+          <span className="w-2.5 h-2.5 rounded-full bg-slate-900 animate-ping" />
+          <span>Reconnecting to WatchParty... Keeping your session active</span>
+        </div>
+      )}
+
       {/* Main Room Layout */}
       <main className="flex-1 flex flex-col lg:flex-row p-2.5 sm:p-4 gap-4 max-w-[1700px] w-full mx-auto overflow-y-auto lg:overflow-hidden">
         {/* Left Column: Player & Reactions (approx 70%) */}
@@ -358,11 +386,9 @@ export const RoomPage: React.FC = () => {
               <Users className="w-3.5 h-3.5" />
               <span>Users ({participants.length})</span>
             </button>
+
             <button
-              onClick={() => {
-                setActiveTab('chat');
-                setUnreadChatCount(0);
-              }}
+              onClick={() => setActiveTab('chat')}
               className={`py-2 text-xs font-semibold rounded-lg flex items-center justify-center gap-1.5 transition relative ${
                 activeTab === 'chat'
                   ? 'bg-gradient-to-r from-brand-violet to-brand-pink text-white shadow'
@@ -372,11 +398,12 @@ export const RoomPage: React.FC = () => {
               <MessageSquare className="w-3.5 h-3.5" />
               <span>Chat</span>
               {unreadChatCount > 0 && activeTab !== 'chat' && (
-                <span className="min-w-4 h-4 px-1 rounded-full bg-gradient-to-r from-brand-pink to-rose-500 text-[10px] font-bold text-white flex items-center justify-center shadow">
-                  {unreadChatCount > 99 ? '99+' : unreadChatCount}
+                <span className="absolute top-1 right-2 w-4 h-4 rounded-full bg-rose-500 text-[10px] text-white flex items-center justify-center font-bold animate-pulse">
+                  {unreadChatCount > 9 ? '9+' : unreadChatCount}
                 </span>
               )}
             </button>
+
             <button
               onClick={() => setActiveTab('requests')}
               className={`py-2 text-xs font-semibold rounded-lg flex items-center justify-center gap-1.5 transition relative ${
@@ -388,14 +415,14 @@ export const RoomPage: React.FC = () => {
               <Clock className="w-3.5 h-3.5" />
               <span>Requests</span>
               {requests.length > 0 && (
-                <span className="w-4 h-4 rounded-full bg-brand-pink text-[10px] font-bold text-white flex items-center justify-center">
+                <span className="absolute top-1 right-2 w-4 h-4 rounded-full bg-amber-500 text-[10px] text-white flex items-center justify-center font-bold">
                   {requests.length}
                 </span>
               )}
             </button>
           </div>
 
-          {/* Tab Contents */}
+          {/* Sidebar Tab Content */}
           <div className="flex-1 overflow-hidden">
             {activeTab === 'participants' && <ParticipantsTab />}
             {activeTab === 'chat' && <ChatTab />}
@@ -403,6 +430,21 @@ export const RoomPage: React.FC = () => {
           </div>
         </aside>
       </main>
+
+      {/* Ephemeral Toast Notification */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 glass-card px-4 py-3 rounded-theme border border-brand-pink/30 shadow-2xl flex items-center gap-3 animate-fade-in max-w-sm">
+          <div className="w-2 h-2 rounded-full bg-brand-pink animate-pulse" />
+          <span className="text-xs text-slate-200 font-medium">{toastMessage}</span>
+          <button
+            onClick={clearToast}
+            className="text-slate-400 hover:text-white ml-2 transition"
+            aria-label="Dismiss message"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
     </div>
   );
 };

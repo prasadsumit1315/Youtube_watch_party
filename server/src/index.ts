@@ -19,7 +19,9 @@ const io = new SocketIOServer(server, {
     },
     credentials: true,
   },
-  maxHttpBufferSize: 10 * 1024, // 10KB payload limit per spec
+  pingTimeout: 30000,
+  pingInterval: 10000,
+  maxHttpBufferSize: 1e6, // 1MB payload limit (allows custom avatars & WebRTC signaling)
 });
 
 // Initialize socket handlers

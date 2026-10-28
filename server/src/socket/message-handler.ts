@@ -815,7 +815,70 @@ export class SocketMessageHandler {
         });
       });
 
-      // 14. LEAVE ROOM
+      // 14. HEARTBEAT / KEEPALIVE
+      socket.on('heartbeat', () => {
+        const session = this.sessions.get(socket.id);
+        if (session) {
+          const room = this.roomManager.getRoom(session.roomId);
+          if (room) {
+            const participant = room.getParticipant(session.userId);
+            if (participant) {
+              participant.touch();
+            }
+          }
+        }
+      });
+
+      // 15. SCREEN SHARING (Host / Moderator only)
+      socket.on('screen_share_started', () => {
+        const ctx = getSessionAndRoom();
+        if (!ctx) return;
+        const { room, participant } = ctx;
+        if (participant.role !== Role.HOST && participant.role !== Role.MODERATOR) {
+          socket.emit('error_event', { code: 'FORBIDDEN', message: 'Only Host or Moderator can share screen' });
+          return;
+        }
+
+        socket.to(room.id).emit('screen_share_started', {
+          hostUserId: participant.userId,
+          username: participant.username,
+        });
+      });
+
+      socket.on('screen_share_stopped', () => {
+        const ctx = getSessionAndRoom();
+        if (!ctx) return;
+        const { room } = ctx;
+        this.io.to(room.id).emit('screen_share_stopped');
+      });
+
+      socket.on('screen_share_request', (data: { targetUserId: string }) => {
+        const ctx = getSessionAndRoom();
+        if (!ctx) return;
+        const { room, participant } = ctx;
+        const target = room.getParticipant(data?.targetUserId);
+        if (target) {
+          this.io.to(target.socketId).emit('screen_share_request', {
+            fromUserId: participant.userId,
+            fromUsername: participant.username,
+          });
+        }
+      });
+
+      socket.on('webrtc_signal', (data: { targetUserId: string; signal: any }) => {
+        const ctx = getSessionAndRoom();
+        if (!ctx) return;
+        const { room, participant } = ctx;
+        const target = room.getParticipant(data?.targetUserId);
+        if (target) {
+          this.io.to(target.socketId).emit('webrtc_signal', {
+            fromUserId: participant.userId,
+            signal: data.signal,
+          });
+        }
+      });
+
+      // 16. LEAVE ROOM
       socket.on('leave_room', async () => {
         const session = this.sessions.get(socket.id);
         if (!session) return;
