@@ -20,6 +20,6 @@ services:
       - key: DIRECT_URL
         sync: false
       - key: PERSIST_CHAT
-        value: false
+        value: "true"
       - key: LOG_LEVEL
         value: info

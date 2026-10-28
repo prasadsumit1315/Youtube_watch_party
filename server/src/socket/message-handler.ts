@@ -260,6 +260,15 @@ export class SocketMessageHandler {
               () => this.memberRepo.upsertMember(room.id, participant!.userId, username, participant!.role),
               'upsertMember'
             ).catch(() => {});
+          } else {
+            persistWithRetry(
+              () => this.memberRepo.upsertMember(room.id, participant!.userId, username, participant!.role),
+              'upsertMemberReconnect'
+            ).catch(() => {});
+          }
+
+          if (env.DATABASE_URL) {
+            this.roomRepo.touchActivity(room.id).catch(() => {});
           }
         } catch (err) {
           logger.error({ error: (err as Error).message }, 'Error in join_room handler');
@@ -429,10 +438,13 @@ export class SocketMessageHandler {
         });
 
         // 2. Persist to DB with retry
-        await persistWithRetry(
-          () => this.roomRepo.updateCurrentVideo(room.id, videoId, participant.userId),
-          'updateCurrentVideo'
-        );
+        if (env.DATABASE_URL) {
+          await persistWithRetry(
+            () => this.roomRepo.updateCurrentVideo(room.id, videoId, participant.userId),
+            'updateCurrentVideo'
+          );
+          this.roomRepo.touchActivity(room.id).catch(() => {});
+        }
       });
 
       // 6. ASSIGN ROLE
@@ -769,11 +781,12 @@ export class SocketMessageHandler {
 
         this.io.to(room.id).emit('chat_message', messagePayload);
 
-        if (env.PERSIST_CHAT) {
+        if (env.PERSIST_CHAT && env.DATABASE_URL) {
           await persistWithRetry(
             () => this.chatRepo.saveMessage(room.id, participant.userId, participant.username, safeText),
             'saveChatMessage'
           );
+          this.roomRepo.touchActivity(room.id).catch(() => {});
         }
       });
 

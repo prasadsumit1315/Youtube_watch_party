@@ -1,4 +1,4 @@
-import { randomInt } from 'crypto';
+import { randomInt, randomUUID } from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { Room } from './room.js';
@@ -9,6 +9,8 @@ import { MemberRepository } from '../repositories/member.repository.js';
 import { Role } from '@prisma/client';
 import { logger } from '../utils/logger.js';
 import { env } from '../config/env.js';
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // Alphabet with no ambiguous characters (omits 0, 1, I, O, L)
 const CODE_ALPHABET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
@@ -54,7 +56,7 @@ export class RoomManager {
     initialVideoId?: string
   ): Promise<Room> {
     const code = generateRoomCode();
-    const roomId = (await import('crypto')).randomUUID();
+    const roomId = randomUUID();
 
     // 1. Create in-memory Room instance first for instant availability
     const room = new Room({
@@ -65,9 +67,9 @@ export class RoomManager {
     });
     this.registerRoomInMemory(room);
 
-    // 2. Persist to DB if database is configured
-    try {
-      if (env.DATABASE_URL) {
+    // 2. Persist to Neon DB with retry to handle database cold starts / connection warmup
+    if (env.DATABASE_URL) {
+      try {
         await this.roomRepo.createRoomWithHost({
           id: roomId,
           code,
@@ -75,12 +77,28 @@ export class RoomManager {
           hostUsername,
           currentVideoId: initialVideoId,
         });
+        logger.info({ roomId, code }, 'Room successfully created and persisted to Neon DB');
+      } catch (err) {
+        logger.warn(
+          { error: (err as Error).message, roomId: room.id },
+          'Initial Neon DB persistence for room creation failed, retrying once...'
+        );
+        try {
+          await this.roomRepo.createRoomWithHost({
+            id: roomId,
+            code,
+            hostUserId,
+            hostUsername,
+            currentVideoId: initialVideoId,
+          });
+          logger.info({ roomId, code }, 'Room successfully persisted to Neon DB on retry');
+        } catch (retryErr) {
+          logger.error(
+            { error: (retryErr as Error).message, roomId: room.id },
+            'Neon DB persistence failed after retry for room creation; running in-memory'
+          );
+        }
       }
-    } catch (err) {
-      logger.warn(
-        { error: (err as Error).message, roomId: room.id },
-        'DB persistence skipped or failed for room creation; running in-memory'
-      );
     }
 
     return room;
@@ -105,15 +123,15 @@ export class RoomManager {
       if (codeOrId.length === 8) {
         dbRoom = await this.roomRepo.findByCode(codeOrId.toUpperCase());
       }
-      if (!dbRoom) {
+      if (!dbRoom && UUID_REGEX.test(codeOrId)) {
         dbRoom = await this.roomRepo.findById(codeOrId);
       }
 
       if (!dbRoom) return null;
 
-      // Check if room is expired
-      if (dbRoom.expiresAt < new Date()) {
-        logger.info({ roomId: dbRoom.id }, 'Attempted to hydrate expired room');
+      // Check if room is closed or expired
+      if (dbRoom.isClosed || dbRoom.expiresAt < new Date()) {
+        logger.info({ roomId: dbRoom.id }, 'Attempted to hydrate expired or closed room');
         return null;
       }
 
@@ -232,7 +250,7 @@ export class RoomManager {
       }
     }, 5 * 60 * 1000);
 
-    // Database expired rooms cleanup every 15 minutes (throttled to 5 min per spec)
+    // Database expired rooms cleanup every 15 minutes
     setInterval(async () => {
       try {
         await this.roomRepo.deleteExpiredRooms();

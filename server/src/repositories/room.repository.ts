@@ -16,9 +16,10 @@ export class RoomRepository {
 
   /**
    * Atomic multi-step transaction to create room, host member, and audit log.
+   * Default expiration set to 30 days (720 hours) so rooms and chat data persist in Neon DB.
    */
   async createRoomWithHost(input: CreateRoomInput): Promise<Room> {
-    const hours = input.expiresInHours ?? 24;
+    const hours = input.expiresInHours ?? (30 * 24);
     const expiresAt = new Date(Date.now() + hours * 60 * 60 * 1000);
 
     return this.prisma.$transaction(async (tx) => {
@@ -151,16 +152,20 @@ export class RoomRepository {
     });
   }
 
-  async touchActivity(id: string, extendHours: number = 24): Promise<void> {
-    const now = new Date();
-    const newExpiresAt = new Date(now.getTime() + extendHours * 60 * 60 * 1000);
-    await this.prisma.room.update({
-      where: { id },
-      data: {
-        lastActiveAt: now,
-        expiresAt: newExpiresAt,
-      },
-    });
+  async touchActivity(id: string, extendHours: number = 30 * 24): Promise<void> {
+    try {
+      const now = new Date();
+      const newExpiresAt = new Date(now.getTime() + extendHours * 60 * 60 * 1000);
+      await this.prisma.room.update({
+        where: { id },
+        data: {
+          lastActiveAt: now,
+          expiresAt: newExpiresAt,
+        },
+      });
+    } catch {
+      // ignore touch failure if room not in DB
+    }
   }
 
   async deleteExpiredRooms(): Promise<number> {
