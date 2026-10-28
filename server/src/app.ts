@@ -42,6 +42,19 @@ export function createApp(customRoomManager?: RoomManager) {
   });
   app.use(limiter);
 
+  // GET / -> Server info
+  app.get('/', (_req: Request, res: Response) => {
+    res.json({
+      name: 'WatchParty Server',
+      status: 'running',
+      version: '1.0.0',
+      endpoints: {
+        health: '/health',
+        api: '/api',
+      },
+    });
+  });
+
   // GET /health -> {status: "ok"} (includes SELECT 1 DB check)
   app.get('/health', async (_req: Request, res: Response) => {
     let dbStatus = 'healthy';
