@@ -92,10 +92,10 @@ export class SocketMessageHandler {
       socket.use(([event, data], next) => {
         try {
           const payloadSize = data ? JSON.stringify(data).length : 0;
-          if (payloadSize > 10 * 1024) {
+          if (payloadSize > 64 * 1024) {
             socket.emit('error_event', {
               code: 'PAYLOAD_TOO_LARGE',
-              message: 'Payload exceeds 10KB limit',
+              message: 'Payload exceeds 64KB limit',
             });
             return;
           }
@@ -119,7 +119,7 @@ export class SocketMessageHandler {
             return;
           }
 
-          const { roomId: requestedRoomId, username, userId: incomingUserId, reconnectToken } = parseResult.data;
+          const { roomId: requestedRoomId, username, avatar, userId: incomingUserId, reconnectToken } = parseResult.data;
 
           // Find or hydrate room
           const room = await this.roomManager.hydrateFromDB(requestedRoomId);
@@ -162,6 +162,7 @@ export class SocketMessageHandler {
             isReconnect = true;
             participant.updateSocket(socket.id);
             participant.username = username;
+            if (avatar) participant.avatar = avatar;
           }
 
           if (!participant) {
@@ -200,6 +201,7 @@ export class SocketMessageHandler {
               username,
               role,
               socketId: socket.id,
+              avatar,
             });
 
             room.addParticipant(participant);
@@ -775,6 +777,7 @@ export class SocketMessageHandler {
           id: randomUUID(),
           userId: participant.userId,
           username: participant.username,
+          avatar: participant.avatar,
           text: safeText,
           createdAt: Date.now(),
         };
@@ -804,8 +807,11 @@ export class SocketMessageHandler {
         this.io.to(room.id).emit('reaction', {
           userId: participant.userId,
           username: participant.username,
+          avatar: participant.avatar,
           emoji: valid.data.emoji,
           timestamp: Date.now(),
+          isHost: participant.role === Role.HOST,
+          role: participant.role,
         });
       });
 

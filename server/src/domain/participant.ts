@@ -6,6 +6,7 @@ export interface PublicParticipant {
   username: string;
   role: Role;
   joinedAt: number;
+  avatar?: string;
 }
 
 export class Participant {
@@ -13,6 +14,7 @@ export class Participant {
   public username: string;
   public role: Role;
   public socketId: string;
+  public avatar?: string;
   public readonly reconnectToken: string;
   public readonly joinedAt: number;
   public lastActiveAt: number;
@@ -22,6 +24,7 @@ export class Participant {
     username: string;
     role: Role;
     socketId: string;
+    avatar?: string;
     reconnectToken?: string;
     joinedAt?: number;
   }) {
@@ -29,6 +32,7 @@ export class Participant {
     this.username = params.username;
     this.role = params.role;
     this.socketId = params.socketId;
+    this.avatar = params.avatar;
     this.reconnectToken = params.reconnectToken ?? randomBytes(24).toString('hex');
     this.joinedAt = params.joinedAt ?? Date.now();
     this.lastActiveAt = Date.now();
@@ -53,6 +57,7 @@ export class Participant {
       username: this.username,
       role: this.role,
       joinedAt: this.joinedAt,
+      avatar: this.avatar,
     };
   }
 }

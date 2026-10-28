@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createRoom, checkRoomExists, pingServer } from '../services/api.js';
+import { AvatarSelector } from '../components/AvatarSelector.js';
 import {
   Tv,
   Sparkles,
@@ -25,6 +26,9 @@ export const LandingPage: React.FC = () => {
   const [joinName, setJoinName] = useState(
     () => sessionStorage.getItem('wp_username') || ''
   );
+  const [avatar, setAvatar] = useState<string>(
+    () => sessionStorage.getItem('wp_avatar') || '🍿'
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -45,6 +49,7 @@ export const LandingPage: React.FC = () => {
     try {
       setIsLoading(true);
       sessionStorage.setItem('wp_username', trimmedName);
+      sessionStorage.setItem('wp_avatar', avatar);
       const res = await createRoom(trimmedName, videoUrl.trim() || undefined);
       if (res.hostUserId) {
         sessionStorage.setItem('wp_user_id', res.hostUserId);
@@ -95,6 +100,7 @@ export const LandingPage: React.FC = () => {
       sessionStorage.removeItem('wp_user_id');
       sessionStorage.removeItem('wp_reconnect_token');
       sessionStorage.setItem('wp_username', trimmedName);
+      sessionStorage.setItem('wp_avatar', avatar);
       sessionStorage.setItem('wp_current_room', targetCode);
       navigate(`/room/${targetCode}`);
     } catch (err) {
@@ -178,6 +184,12 @@ export const LandingPage: React.FC = () => {
 
           {activeTab === 'create' ? (
             <form onSubmit={handleCreateRoom} className="space-y-4">
+              <AvatarSelector
+                selectedAvatar={avatar}
+                onSelectAvatar={setAvatar}
+                label="Host Profile Avatar or Photo"
+              />
+
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
                   Your Display Name <span className="text-brand-pink">*</span>
@@ -235,6 +247,12 @@ export const LandingPage: React.FC = () => {
                   className="w-full px-4 py-2.5 bg-brand-darkSurface border border-white/10 rounded-theme text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-brand-pink transition"
                 />
               </div>
+
+              <AvatarSelector
+                selectedAvatar={avatar}
+                onSelectAvatar={setAvatar}
+                label="Viewer Profile Avatar or Photo"
+              />
 
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">

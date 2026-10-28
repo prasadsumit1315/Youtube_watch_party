@@ -43,7 +43,25 @@ export const ChatTab: React.FC = () => {
                 key={msg.id}
                 className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}
               >
-                <div className="flex items-baseline gap-1.5 mb-1 px-1">
+                <div className={`flex items-center gap-1.5 mb-1 px-1 ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
+                  {/* User Profile Avatar */}
+                  <div className="w-4 h-4 rounded-full overflow-hidden flex items-center justify-center text-xs shrink-0 select-none">
+                    {msg.avatar ? (
+                      msg.avatar.startsWith('data:image/') ? (
+                        <img
+                          src={msg.avatar}
+                          alt={msg.username}
+                          className="w-full h-full object-cover rounded-full"
+                        />
+                      ) : (
+                        <span>{msg.avatar}</span>
+                      )
+                    ) : (
+                      <div className="w-full h-full rounded-full bg-gradient-to-tr from-brand-violet to-brand-pink flex items-center justify-center text-[8px] font-bold text-white">
+                        {msg.username.slice(0, 1).toUpperCase()}
+                      </div>
+                    )}
+                  </div>
                   <span className="text-[11px] font-medium text-slate-400">
                     {msg.username}
                   </span>

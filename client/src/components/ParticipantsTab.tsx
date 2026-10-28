@@ -40,7 +40,7 @@ export const ParticipantsTab: React.FC = () => {
       case 'MODERATOR':
         return (
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-violet-500/20 text-violet-400 border border-violet-500/30">
-            <Shield className="w-3 h-3" /> Mod
+            <Shield className="w-3 h-3" /> Moderator (Co-Host)
           </span>
         );
       case 'PARTICIPANT':
@@ -93,10 +93,23 @@ export const ParticipantsTab: React.FC = () => {
               className="flex items-center justify-between p-2.5 rounded-theme bg-white/[0.03] hover:bg-white/[0.06] border border-white/5 transition"
             >
               <div className="flex items-center gap-3">
-                {/* Initials Avatar */}
-                <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-brand-violet to-brand-pink flex items-center justify-center text-xs font-bold text-white shadow">
-                  {getInitials(user.username)}
+                {/* Profile Photo / Avatar */}
+                <div className="w-9 h-9 rounded-full overflow-hidden bg-gradient-to-tr from-brand-violet to-brand-pink flex items-center justify-center text-xs font-bold text-white shadow shrink-0 border border-white/10">
+                  {user.avatar ? (
+                    user.avatar.startsWith('data:image/') ? (
+                      <img
+                        src={user.avatar}
+                        alt={user.username}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-base select-none">{user.avatar}</span>
+                    )
+                  ) : (
+                    <span>{getInitials(user.username)}</span>
+                  )}
                 </div>
+
                 <div className="flex flex-col">
                   <div className="flex items-center gap-1.5">
                     <span className="text-sm font-medium text-slate-200">
@@ -124,7 +137,7 @@ export const ParticipantsTab: React.FC = () => {
                   </button>
 
                   {activeMenuUserId === user.userId && (
-                    <div className="absolute right-0 top-8 z-30 w-48 glass-panel p-1.5 rounded-theme shadow-2xl border border-brand-border animate-fade-in text-xs">
+                    <div className="absolute right-0 top-8 z-30 w-56 glass-panel p-1.5 rounded-theme shadow-2xl border border-brand-border animate-fade-in text-xs">
                       {user.role === 'PARTICIPANT' ? (
                         <button
                           onClick={() => {
@@ -134,9 +147,10 @@ export const ParticipantsTab: React.FC = () => {
                               newRole: 'MODERATOR',
                             });
                           }}
-                          className="w-full flex items-center gap-2 px-3 py-2 text-left rounded-lg text-slate-300 hover:bg-white/10 hover:text-white"
+                          className="w-full flex items-center gap-2 px-3 py-2 text-left rounded-lg text-slate-200 hover:bg-white/10 hover:text-white"
                         >
-                          <Shield className="w-3.5 h-3.5 text-brand-violet" /> Make Moderator
+                          <Shield className="w-3.5 h-3.5 text-brand-violet" />
+                          <span>Give Host Controls (Make Mod)</span>
                         </button>
                       ) : (
                         <button
@@ -147,9 +161,10 @@ export const ParticipantsTab: React.FC = () => {
                               newRole: 'PARTICIPANT',
                             });
                           }}
-                          className="w-full flex items-center gap-2 px-3 py-2 text-left rounded-lg text-slate-300 hover:bg-white/10 hover:text-white"
+                          className="w-full flex items-center gap-2 px-3 py-2 text-left rounded-lg text-slate-200 hover:bg-white/10 hover:text-white"
                         >
-                          <UserCheck className="w-3.5 h-3.5 text-slate-400" /> Make Participant
+                          <UserCheck className="w-3.5 h-3.5 text-slate-400" />
+                          <span>Revoke Host Controls (Make Viewer)</span>
                         </button>
                       )}
 
@@ -162,7 +177,7 @@ export const ParticipantsTab: React.FC = () => {
                         }}
                         className="w-full flex items-center gap-2 px-3 py-2 text-left rounded-lg text-amber-300 hover:bg-amber-500/10"
                       >
-                        <ArrowRightLeft className="w-3.5 h-3.5" /> Transfer Host
+                        <ArrowRightLeft className="w-3.5 h-3.5" /> Transfer Full Host
                       </button>
 
                       <div className="my-1 border-t border-white/5" />
@@ -194,7 +209,10 @@ export const ParticipantsTab: React.FC = () => {
             <h3 className="text-base font-bold text-slate-100 mb-2">
               {confirmDialog.type === 'remove' && `Remove and Ban ${confirmDialog.targetUser.username}?`}
               {confirmDialog.type === 'transfer' && `Transfer Host to ${confirmDialog.targetUser.username}?`}
-              {confirmDialog.type === 'role' && `Change ${confirmDialog.targetUser.username}'s Role?`}
+              {confirmDialog.type === 'role' &&
+                (confirmDialog.newRole === 'MODERATOR'
+                  ? `Give Host Controls to ${confirmDialog.targetUser.username}?`
+                  : `Revoke Host Controls from ${confirmDialog.targetUser.username}?`)}
             </h3>
             <p className="text-xs text-slate-400 mb-6 leading-relaxed">
               {confirmDialog.type === 'remove' &&
@@ -202,7 +220,9 @@ export const ParticipantsTab: React.FC = () => {
               {confirmDialog.type === 'transfer' &&
                 'You will hand over room ownership. You will be demoted to Moderator.'}
               {confirmDialog.type === 'role' &&
-                `Promote or demote user to ${confirmDialog.newRole}.`}
+                (confirmDialog.newRole === 'MODERATOR'
+                  ? `Grant ${confirmDialog.targetUser.username} full video playback controls (play, pause, seek, change video, and approve requests). You can change this back at any time.`
+                  : `Revoke Moderator video playback controls and return ${confirmDialog.targetUser.username} to a regular viewer.`)}
             </p>
             <div className="flex justify-end gap-2">
               <button

@@ -3,6 +3,7 @@ export type Role = 'HOST' | 'MODERATOR' | 'PARTICIPANT';
 export interface PublicParticipant {
   userId: string;
   username: string;
+  avatar?: string;
   role: Role;
   joinedAt: number;
 }
@@ -23,6 +24,7 @@ export interface ChatMessage {
   id: string;
   userId: string;
   username: string;
+  avatar?: string;
   text: string;
   createdAt: number;
 }
@@ -30,8 +32,11 @@ export interface ChatMessage {
 export interface ReactionEvent {
   userId: string;
   username: string;
+  avatar?: string;
   emoji: string;
   timestamp: number;
+  isHost?: boolean;
+  role?: Role;
 }
 
 export interface SyncStatePayload {

@@ -14,6 +14,7 @@ export const JoinRoomSchema = z.object({
       message: 'Username must be between 1 and 24 characters',
     }),
   userId: z.string().optional(),
+  avatar: z.string().max(200000).optional(),
   reconnectToken: z.string().optional(),
 });
 
@@ -57,5 +58,5 @@ export const ChatMessageSchema = z.object({
 });
 
 export const ReactionSchema = z.object({
-  emoji: z.string().min(1).max(8),
+  emoji: z.string().min(1).max(32),
 });

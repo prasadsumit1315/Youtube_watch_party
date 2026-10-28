@@ -6,6 +6,7 @@ import { ParticipantsTab } from '../components/ParticipantsTab.js';
 import { ChatTab } from '../components/ChatTab.js';
 import { RequestsTab } from '../components/RequestsTab.js';
 import { ReactionsOverlay } from '../components/ReactionsOverlay.js';
+import { AvatarSelector } from '../components/AvatarSelector.js';
 import {
   ConnectingScreen,
   NotFoundScreen,
@@ -51,6 +52,7 @@ export const RoomPage: React.FC = () => {
   const [copiedLink, setCopiedLink] = useState(false);
   const [promptUsername, setPromptUsername] = useState(false);
   const [tempUsername, setTempUsername] = useState('');
+  const [tempAvatar, setTempAvatar] = useState<string>(() => sessionStorage.getItem('wp_avatar') || '🍿');
 
   // Track unread chat messages when user is not on the chat tab
   useEffect(() => {
@@ -105,7 +107,8 @@ export const RoomPage: React.FC = () => {
     sessionStorage.removeItem('wp_user_id');
     sessionStorage.removeItem('wp_reconnect_token');
     sessionStorage.setItem('wp_username', tempUsername.trim());
-    joinRoom(id, tempUsername.trim());
+    sessionStorage.setItem('wp_avatar', tempAvatar);
+    joinRoom(id, tempUsername.trim(), tempAvatar);
     setPromptUsername(false);
   };
 
@@ -176,6 +179,11 @@ export const RoomPage: React.FC = () => {
             Enter a display name to enter the synchronized room.
           </p>
           <form onSubmit={handleUsernameSubmit} className="space-y-4">
+            <AvatarSelector
+              selectedAvatar={tempAvatar}
+              onSelectAvatar={setTempAvatar}
+              label="Choose Profile Photo"
+            />
             <input
               type="text"
               required
@@ -303,7 +311,16 @@ export const RoomPage: React.FC = () => {
 
         {/* Right header controls */}
         <div className="flex items-center gap-2 sm:gap-3">
-          {getRoleBadge()}
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-full overflow-hidden border border-white/10 bg-brand-darkSurface flex items-center justify-center text-sm shadow">
+              {sessionStorage.getItem('wp_avatar')?.startsWith('data:image/') ? (
+                <img src={sessionStorage.getItem('wp_avatar')!} alt="You" className="w-full h-full object-cover" />
+              ) : (
+                <span>{sessionStorage.getItem('wp_avatar') || '🍿'}</span>
+              )}
+            </div>
+            {getRoleBadge()}
+          </div>
 
           <button
             onClick={handleLeave}

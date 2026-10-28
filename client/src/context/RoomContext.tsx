@@ -30,7 +30,7 @@ interface RoomContextType {
   chatMessages: ChatMessage[];
   reactions: ReactionEvent[];
   toastMessage: string | null;
-  joinRoom: (roomId: string, username: string) => void;
+  joinRoom: (roomId: string, username: string, avatar?: string) => void;
   leaveRoom: () => void;
   play: (currentTime?: number) => void;
   pause: (currentTime?: number) => void;
@@ -71,11 +71,14 @@ export const RoomProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setToastMessage(null);
   }, []);
 
-  const joinRoom = useCallback((roomId: string, userDisplayName: string) => {
+  const joinRoom = useCallback((roomId: string, userDisplayName: string, userAvatar?: string) => {
     const socket = getSocket();
     activeRoomIdRef.current = roomId;
     setUsername(userDisplayName);
     sessionStorage.setItem('wp_username', userDisplayName);
+    if (userAvatar) {
+      sessionStorage.setItem('wp_avatar', userAvatar);
+    }
     setConnectionStatus('connecting');
 
     if (!socket.connected) {
@@ -84,11 +87,13 @@ export const RoomProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const reconnectToken = getMemoryReconnectToken() || sessionStorage.getItem('wp_reconnect_token') || undefined;
     const storedUserId = sessionStorage.getItem('wp_user_id') || undefined;
+    const storedAvatar = userAvatar || sessionStorage.getItem('wp_avatar') || undefined;
 
     const emitJoin = () => {
       socket.emit('join_room', {
         roomId,
         username: userDisplayName,
+        avatar: storedAvatar,
         userId: storedUserId,
         reconnectToken,
       });
@@ -129,6 +134,7 @@ export const RoomProvider: React.FC<{ children: React.ReactNode }> = ({ children
         socket.emit('join_room', {
           roomId: activeRoomIdRef.current,
           username,
+          avatar: sessionStorage.getItem('wp_avatar') || undefined,
           userId: sessionStorage.getItem('wp_user_id') || undefined,
           reconnectToken: getMemoryReconnectToken() || sessionStorage.getItem('wp_reconnect_token') || undefined,
         });

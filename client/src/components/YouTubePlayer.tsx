@@ -600,7 +600,7 @@ export const YouTubePlayer: React.FC = () => {
       <div
         onClick={handleTogglePlay}
         className="relative w-full aspect-video min-h-[220px] sm:min-h-[440px] bg-black rounded-theme overflow-hidden border border-brand-border/60 shadow-2xl flex items-center justify-center cursor-pointer select-none"
-        title={canControl ? 'Click to Play / Pause' : undefined}
+        
       >
         {/* The YouTube iframe container (100% width and 100% height, pointer-events-none to prevent YouTube on-screen UI) */}
         <div ref={playerContainerRef} className="w-full h-full relative pointer-events-none" />
@@ -813,7 +813,13 @@ export const YouTubePlayer: React.FC = () => {
               </button>
 
               {showSettingsMenu && (
-                <div className="absolute right-0 bottom-full mb-2 w-64 p-3 bg-brand-darkBg/95 backdrop-blur-xl border border-brand-border rounded-2xl shadow-2xl z-30 animate-fade-in flex flex-col gap-3">
+                <>
+                  {/* Backdrop for mobile view */}
+                  <div
+                    className="fixed inset-0 z-30 sm:hidden bg-black/40 backdrop-blur-xs"
+                    onClick={() => setShowSettingsMenu(false)}
+                  />
+                  <div className="fixed inset-x-4 bottom-24 max-w-xs mx-auto sm:max-w-none sm:mx-0 sm:absolute sm:inset-auto sm:right-0 sm:bottom-full sm:mb-2 sm:w-64 p-3.5 bg-brand-darkBg/95 backdrop-blur-xl border border-brand-border rounded-2xl shadow-2xl z-40 animate-fade-in flex flex-col gap-3">
                   {/* Playback Speed section */}
                   <div>
                     <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
@@ -859,6 +865,7 @@ export const YouTubePlayer: React.FC = () => {
                     </div>
                   </div>
                 </div>
+                </>
               )}
             </div>
 
