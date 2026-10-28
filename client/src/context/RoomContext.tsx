@@ -45,11 +45,6 @@ interface RoomContextType {
   sendMessage: (text: string) => void;
   sendReaction: (emoji: string) => void;
   clearToast: () => void;
-  isScreenSharing: boolean;
-  isLocalScreenShare: boolean;
-  screenStream: MediaStream | null;
-  startScreenShare: () => Promise<boolean>;
-  stopScreenShare: () => void;
 }
 
 const RoomContext = createContext<RoomContextType | undefined>(undefined);
@@ -66,16 +61,6 @@ export const RoomProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [reactions, setReactions] = useState<ReactionEvent[]>([]);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Screen Sharing state & WebRTC refs
-  const [isScreenSharing, setIsScreenSharing] = useState<boolean>(false);
-  const [isLocalScreenShare, setIsLocalScreenShare] = useState<boolean>(false);
-  const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
-
-  const localStreamRef = useRef<MediaStream | null>(null);
-  const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
-  const viewerPcRef = useRef<RTCPeerConnection | null>(null);
-  const screenShareHostUserIdRef = useRef<string | null>(null);
-
   const activeRoomIdRef = useRef<string | null>(null);
 
   const showToast = useCallback((msg: string) => {
@@ -85,71 +70,6 @@ export const RoomProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const clearToast = useCallback(() => {
     setToastMessage(null);
   }, []);
-
-  const stopScreenShare = useCallback(() => {
-    if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach((track) => track.stop());
-      localStreamRef.current = null;
-    }
-    peerConnectionsRef.current.forEach((pc) => {
-      try { pc.close(); } catch {}
-    });
-    peerConnectionsRef.current.clear();
-
-    if (viewerPcRef.current) {
-      try { viewerPcRef.current.close(); } catch {}
-      viewerPcRef.current = null;
-    }
-
-    setScreenStream(null);
-    setIsScreenSharing(false);
-    setIsLocalScreenShare(false);
-    screenShareHostUserIdRef.current = null;
-
-    const socket = getSocket();
-    if (socket.connected) {
-      socket.emit('screen_share_stopped');
-    }
-  }, []);
-
-  const startScreenShare = useCallback(async (): Promise<boolean> => {
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
-      showToast('Screen sharing is not supported on this device/browser');
-      return false;
-    }
-
-    try {
-      const stream = await navigator.mediaDevices.getDisplayMedia({
-        video: {
-          displaySurface: 'monitor',
-          cursor: 'always',
-        } as any,
-        audio: true,
-      });
-
-      localStreamRef.current = stream;
-      setScreenStream(stream);
-      setIsScreenSharing(true);
-      setIsLocalScreenShare(true);
-
-      const socket = getSocket();
-      socket.emit('screen_share_started');
-
-      const videoTrack = stream.getVideoTracks()[0];
-      if (videoTrack) {
-        videoTrack.onended = () => {
-          stopScreenShare();
-        };
-      }
-      showToast('Screen sharing started! All viewers can now see your screen.');
-      return true;
-    } catch (err) {
-      if ((err as Error).name !== 'NotAllowedError') {
-        showToast('Failed to start screen share: ' + (err as Error).message);
-      }
-      return false;
-    }
-  }, [showToast, stopScreenShare]);
 
   const joinRoom = useCallback((roomId: string, userDisplayName: string, userAvatar?: string) => {
     const socket = getSocket();
@@ -187,7 +107,6 @@ export const RoomProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const leaveRoom = useCallback(() => {
-    stopScreenShare();
     const socket = getSocket();
     if (socket.connected) {
       socket.emit('leave_room');
@@ -202,7 +121,7 @@ export const RoomProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setReactions([]);
     setConnectionStatus('idle');
     activeRoomIdRef.current = null;
-  }, [stopScreenShare]);
+  }, []);
 
   // Socket event listeners
   useEffect(() => {
@@ -342,116 +261,6 @@ export const RoomProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }, 15000);
 
-    const handleScreenShareStarted = (data: { hostUserId: string; username: string }) => {
-      screenShareHostUserIdRef.current = data.hostUserId;
-      setIsScreenSharing(true);
-      setIsLocalScreenShare(false);
-      showToast(`${data.username} started sharing screen`);
-      socket.emit('screen_share_request', { targetUserId: data.hostUserId });
-    };
-
-    const handleScreenShareStopped = () => {
-      if (viewerPcRef.current) {
-        try { viewerPcRef.current.close(); } catch {}
-        viewerPcRef.current = null;
-      }
-      setScreenStream(null);
-      setIsScreenSharing(false);
-      setIsLocalScreenShare(false);
-      screenShareHostUserIdRef.current = null;
-      showToast('Screen sharing ended');
-    };
-
-    const handleScreenShareRequest = async (data: { fromUserId: string; fromUsername: string }) => {
-      if (!localStreamRef.current) return;
-      try {
-        const pc = new RTCPeerConnection({
-          iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
-        });
-        peerConnectionsRef.current.set(data.fromUserId, pc);
-
-        localStreamRef.current.getTracks().forEach((track: MediaStreamTrack) => {
-          pc.addTrack(track, localStreamRef.current!);
-        });
-
-        pc.onicecandidate = (event: RTCPeerConnectionIceEvent) => {
-          if (event.candidate) {
-            socket.emit('webrtc_signal', {
-              targetUserId: data.fromUserId,
-              signal: { type: 'candidate', candidate: event.candidate },
-            });
-          }
-        };
-
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-        socket.emit('webrtc_signal', {
-          targetUserId: data.fromUserId,
-          signal: { type: 'offer', sdp: offer },
-        });
-      } catch (err) {
-        console.warn('Error creating WebRTC offer:', err);
-      }
-    };
-
-    const handleWebrtcSignal = async (data: { fromUserId: string; signal: any }) => {
-      const { fromUserId, signal } = data;
-      if (!signal) return;
-
-      if (signal.type === 'offer') {
-        try {
-          const pc = new RTCPeerConnection({
-            iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
-          });
-          viewerPcRef.current = pc;
-
-          pc.ontrack = (event: RTCTrackEvent) => {
-            if (event.streams && event.streams[0]) {
-              setScreenStream(event.streams[0]);
-              setIsScreenSharing(true);
-            }
-          };
-
-          pc.onicecandidate = (event: RTCPeerConnectionIceEvent) => {
-            if (event.candidate) {
-              socket.emit('webrtc_signal', {
-                targetUserId: fromUserId,
-                signal: { type: 'candidate', candidate: event.candidate },
-              });
-            }
-          };
-
-          await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
-          const answer = await pc.createAnswer();
-          await pc.setLocalDescription(answer);
-          socket.emit('webrtc_signal', {
-            targetUserId: fromUserId,
-            signal: { type: 'answer', sdp: answer },
-          });
-        } catch (err) {
-          console.warn('Error handling WebRTC offer:', err);
-        }
-      } else if (signal.type === 'answer') {
-        const pc = peerConnectionsRef.current.get(fromUserId);
-        if (pc) {
-          try {
-            await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
-          } catch (err) {
-            console.warn('Error setting remote answer:', err);
-          }
-        }
-      } else if (signal.type === 'candidate' && signal.candidate) {
-        const pc = localStreamRef.current ? peerConnectionsRef.current.get(fromUserId) : viewerPcRef.current;
-        if (pc && pc.remoteDescription) {
-          try {
-            await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
-          } catch (err) {
-            // ignore
-          }
-        }
-      }
-    };
-
     socket.on('connect', handleConnect);
     socket.on('disconnect', handleDisconnect);
     socket.on('sync_state', handleSyncState);
@@ -467,10 +276,6 @@ export const RoomProvider: React.FC<{ children: React.ReactNode }> = ({ children
     socket.on('reaction', handleReaction);
     socket.on('error_event', handleErrorEvent);
     socket.on('removed', handleRemoved);
-    socket.on('screen_share_started', handleScreenShareStarted);
-    socket.on('screen_share_stopped', handleScreenShareStopped);
-    socket.on('screen_share_request', handleScreenShareRequest);
-    socket.on('webrtc_signal', handleWebrtcSignal);
 
     return () => {
       clearInterval(heartbeatTimer);
@@ -489,10 +294,6 @@ export const RoomProvider: React.FC<{ children: React.ReactNode }> = ({ children
       socket.off('reaction', handleReaction);
       socket.off('error_event', handleErrorEvent);
       socket.off('removed', handleRemoved);
-      socket.off('screen_share_started', handleScreenShareStarted);
-      socket.off('screen_share_stopped', handleScreenShareStopped);
-      socket.off('screen_share_request', handleScreenShareRequest);
-      socket.off('webrtc_signal', handleWebrtcSignal);
     };
   }, [showToast, ownUserId, username, connectionStatus]);
 
@@ -578,11 +379,6 @@ export const RoomProvider: React.FC<{ children: React.ReactNode }> = ({ children
         sendMessage,
         sendReaction,
         clearToast,
-        isScreenSharing,
-        isLocalScreenShare,
-        screenStream,
-        startScreenShare,
-        stopScreenShare,
       }}
     >
       {children}

@@ -16,8 +16,6 @@ import {
   Radio,
   Settings,
   Check,
-  MonitorUp,
-  StopCircle,
 } from 'lucide-react';
 
 declare global {
@@ -60,16 +58,10 @@ export const YouTubePlayer: React.FC = () => {
     seek,
     changeVideo,
     requestAction,
-    isScreenSharing,
-    isLocalScreenShare,
-    screenStream,
-    startScreenShare,
-    stopScreenShare,
   } = useRoom();
 
   const playerContainerRef = useRef<HTMLDivElement>(null);
   const playerWrapperRef = useRef<HTMLDivElement>(null);
-  const screenVideoRef = useRef<HTMLVideoElement>(null);
   const playerRef = useRef<any>(null);
   const isProgrammaticAction = useRef<boolean>(false);
   const lastStateChangeTime = useRef<number>(0);
@@ -88,14 +80,6 @@ export const YouTubePlayer: React.FC = () => {
   const [currentQuality, setCurrentQuality] = useState<string>('auto');
 
   const canControl = ownRole === 'HOST' || ownRole === 'MODERATOR';
-
-  // Attach screen share stream to video element
-  useEffect(() => {
-    if (screenVideoRef.current && screenStream) {
-      screenVideoRef.current.srcObject = screenStream;
-      screenVideoRef.current.play().catch(() => {});
-    }
-  }, [screenStream, isScreenSharing]);
 
   // 1. Initialize Player using host: https://www.youtube-nocookie.com per spec
   useEffect(() => {
@@ -622,43 +606,11 @@ export const YouTubePlayer: React.FC = () => {
         onClick={handleTogglePlay}
         className="relative w-full aspect-video min-h-[220px] sm:min-h-[440px] bg-black rounded-theme overflow-hidden border border-brand-border/60 shadow-2xl flex items-center justify-center cursor-pointer select-none"
       >
-        {/* Screen Share Live Viewport */}
-        {isScreenSharing && screenStream ? (
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="absolute inset-0 z-20 bg-black flex items-center justify-center"
-          >
-            <video
-              ref={screenVideoRef}
-              autoPlay
-              playsInline
-              muted={isLocalScreenShare}
-              className="w-full h-full object-contain"
-            />
-            {/* Live Indicator Overlay */}
-            <div className="absolute top-3 left-3 z-30 flex items-center gap-2 px-3 py-1 rounded-full bg-red-600/90 text-white text-xs font-bold shadow-lg backdrop-blur-sm animate-pulse">
-              <span className="w-2 h-2 rounded-full bg-white animate-ping" />
-              <span>LIVE SCREEN SHARE</span>
-            </div>
-            {isLocalScreenShare && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  stopScreenShare();
-                }}
-                className="absolute top-3 right-3 z-30 px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-semibold shadow-lg transition flex items-center gap-1.5"
-              >
-                <StopCircle className="w-4 h-4" /> Stop Sharing
-              </button>
-            )}
-          </div>
-        ) : (
-          /* Normal YouTube container */
-          <div ref={playerContainerRef} className="w-full h-full relative pointer-events-none" />
-        )}
+        {/* The YouTube iframe container (100% width and 100% height, pointer-events-none to prevent YouTube on-screen UI) */}
+        <div ref={playerContainerRef} className="w-full h-full relative pointer-events-none" />
 
-        {/* Empty state when no video and no screen share */}
-        {!syncState?.videoId && !isScreenSharing && (
+        {/* Empty state when no video is loaded */}
+        {!syncState?.videoId && (
           <div
             onClick={(e) => e.stopPropagation()}
             className="absolute inset-0 flex flex-col items-center justify-center bg-brand-darkBg/95 z-10 text-center p-6 cursor-default"
@@ -667,24 +619,16 @@ export const YouTubePlayer: React.FC = () => {
             <h3 className="text-xl font-bold text-slate-100 mb-2">No Video Selected</h3>
             <p className="text-slate-400 text-sm max-w-sm mb-4">
               {canControl
-                ? 'Paste any YouTube URL, video ID, or share your screen with the room.'
-                : 'Waiting for Host or Moderator to select a YouTube video or start screen share.'}
+                ? 'Paste any YouTube URL or video ID to start watching with the room.'
+                : 'Waiting for Host or Moderator to select a YouTube video.'}
             </p>
             {canControl && (
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => setShowChangeVideoModal(true)}
-                  className="gradient-btn px-5 py-2.5 rounded-theme text-sm font-semibold text-white shadow-lg flex items-center gap-2"
-                >
-                  <Sparkles className="w-4 h-4" /> Load YouTube Video
-                </button>
-                <button
-                  onClick={startScreenShare}
-                  className="px-4 py-2.5 rounded-theme text-sm font-semibold text-white bg-white/10 hover:bg-white/20 border border-white/15 flex items-center gap-2 transition"
-                >
-                  <MonitorUp className="w-4 h-4 text-brand-pink" /> Share Screen
-                </button>
-              </div>
+              <button
+                onClick={() => setShowChangeVideoModal(true)}
+                className="gradient-btn px-5 py-2.5 rounded-theme text-sm font-semibold text-white shadow-lg flex items-center gap-2"
+              >
+                <Sparkles className="w-4 h-4" /> Load YouTube Video
+              </button>
             )}
           </div>
         )}
@@ -695,23 +639,23 @@ export const YouTubePlayer: React.FC = () => {
         {/* Scrubber timeline */}
         <div className="flex items-center gap-3">
           <span className="text-xs font-mono text-slate-300 w-12 text-right">
-            {isScreenSharing ? 'LIVE' : formatTime(currentPlayTime)}
+            {formatTime(currentPlayTime)}
           </span>
           <input
             type="range"
             min={0}
             max={videoDuration || 100}
             step={0.5}
-            value={isScreenSharing ? 100 : currentPlayTime}
+            value={currentPlayTime}
             onChange={handleSeekChange}
-            disabled={!canControl || isScreenSharing}
+            disabled={!canControl}
             className={`w-full h-2 bg-slate-800 rounded-lg appearance-none accent-brand-pink transition cursor-pointer ${
-              !canControl || isScreenSharing ? 'opacity-70 cursor-not-allowed' : ''
+              !canControl ? 'opacity-70 cursor-not-allowed' : ''
             }`}
             aria-label="Video scrubber"
           />
           <span className="text-xs font-mono text-slate-400 w-12">
-            {isScreenSharing ? 'LIVE' : formatTime(videoDuration)}
+            {formatTime(videoDuration)}
           </span>
         </div>
 
@@ -720,98 +664,87 @@ export const YouTubePlayer: React.FC = () => {
           {/* Left: Playback & Skip Controls */}
           <div className="flex items-center gap-1.5 sm:gap-2">
             {/* Play/Pause Button */}
-            {!isScreenSharing && (
-              <>
-                <button
-                  onClick={handleTogglePlay}
-                  className={`p-2.5 rounded-xl text-white transition active:scale-95 flex items-center gap-1.5 shadow ${
-                    canControl
-                      ? 'gradient-btn'
-                      : 'bg-brand-violet/20 hover:bg-brand-violet/30 text-brand-violet border border-brand-violet/30 text-xs px-3'
-                  }`}
-                  title={
-                    canControl
-                      ? syncState?.playState === 'PLAYING'
-                        ? 'Pause'
-                        : 'Play'
-                      : 'Request Play/Pause'
+            <button
+              onClick={handleTogglePlay}
+              className={`p-2.5 rounded-xl text-white transition active:scale-95 flex items-center gap-1.5 shadow ${
+                canControl
+                  ? 'gradient-btn'
+                  : 'bg-brand-violet/20 hover:bg-brand-violet/30 text-brand-violet border border-brand-violet/30 text-xs px-3'
+              }`}
+              title={
+                canControl
+                  ? syncState?.playState === 'PLAYING'
+                    ? 'Pause'
+                    : 'Play'
+                  : 'Request Play/Pause'
+              }
+              aria-label={syncState?.playState === 'PLAYING' ? 'Pause' : 'Play'}
+            >
+              {canControl ? (
+                syncState?.playState === 'PLAYING' ? (
+                  <Pause className="w-5 h-5 fill-current" />
+                ) : (
+                  <Play className="w-5 h-5 fill-current ml-0.5" />
+                )
+              ) : (
+                <>
+                  <Send className="w-3.5 h-3.5" />
+                  <span>Request Play</span>
+                </>
+              )}
+            </button>
+
+            {/* Skip Backward 10s */}
+            <button
+              onClick={handleSkipBackward}
+              className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 transition flex items-center gap-1 text-xs"
+              title="Skip backward 10 seconds"
+              aria-label="Skip backward 10 seconds"
+            >
+              <Rewind className="w-4 h-4" />
+              <span className="text-[10px] font-mono hidden sm:inline">-10s</span>
+            </button>
+
+            {/* Skip Forward 10s */}
+            <button
+              onClick={handleSkipForward}
+              className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 transition flex items-center gap-1 text-xs"
+              title="Skip forward 10 seconds"
+              aria-label="Skip forward 10 seconds"
+            >
+              <FastForward className="w-4 h-4" />
+              <span className="text-[10px] font-mono hidden sm:inline">+10s</span>
+            </button>
+
+            {/* Restart from beginning */}
+            {canControl && (
+              <button
+                onClick={() => {
+                  try {
+                    playerRef.current?.seekTo?.(0, true);
+                    setCurrentPlayTime(0);
+                  } catch {
+                    // ignore
                   }
-                  aria-label={syncState?.playState === 'PLAYING' ? 'Pause' : 'Play'}
-                >
-                  {canControl ? (
-                    syncState?.playState === 'PLAYING' ? (
-                      <Pause className="w-5 h-5 fill-current" />
-                    ) : (
-                      <Play className="w-5 h-5 fill-current ml-0.5" />
-                    )
-                  ) : (
-                    <>
-                      <Send className="w-3.5 h-3.5" />
-                      <span>Request Play</span>
-                    </>
-                  )}
-                </button>
-
-                {/* Skip Backward 10s */}
-                <button
-                  onClick={handleSkipBackward}
-                  className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 transition flex items-center gap-1 text-xs"
-                  title="Skip backward 10 seconds"
-                  aria-label="Skip backward 10 seconds"
-                >
-                  <Rewind className="w-4 h-4" />
-                  <span className="text-[10px] font-mono hidden sm:inline">-10s</span>
-                </button>
-
-                {/* Skip Forward 10s */}
-                <button
-                  onClick={handleSkipForward}
-                  className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 transition flex items-center gap-1 text-xs"
-                  title="Skip forward 10 seconds"
-                  aria-label="Skip forward 10 seconds"
-                >
-                  <FastForward className="w-4 h-4" />
-                  <span className="text-[10px] font-mono hidden sm:inline">+10s</span>
-                </button>
-
-                {/* Restart from beginning */}
-                {canControl && (
-                  <button
-                    onClick={() => {
-                      try {
-                        playerRef.current?.seekTo?.(0, true);
-                        setCurrentPlayTime(0);
-                      } catch {
-                        // ignore
-                      }
-                      seek(0);
-                    }}
-                    className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 transition"
-                    title="Restart from beginning"
-                    aria-label="Restart video"
-                  >
-                    <RotateCcw className="w-4 h-4" />
-                  </button>
-                )}
-
-                {/* Sync to Live Button */}
-                <button
-                  onClick={handleSyncToLive}
-                  className="px-2.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-emerald-400 border border-emerald-500/20 text-xs flex items-center gap-1 transition"
-                  title="Re-synchronize with room"
-                >
-                  <Radio className="w-3.5 h-3.5 animate-pulse" />
-                  <span className="hidden sm:inline">Live</span>
-                </button>
-              </>
+                  seek(0);
+                }}
+                className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 transition"
+                title="Restart from beginning"
+                aria-label="Restart video"
+              >
+                <RotateCcw className="w-4 h-4" />
+              </button>
             )}
 
-            {isScreenSharing && (
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-semibold">
-                <span className="w-2 h-2 rounded-full bg-red-400 animate-ping" />
-                <span>Screen Share Broadcast Active</span>
-              </div>
-            )}
+            {/* Sync to Live Button */}
+            <button
+              onClick={handleSyncToLive}
+              className="px-2.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-emerald-400 border border-emerald-500/20 text-xs flex items-center gap-1 transition"
+              title="Re-synchronize with room"
+            >
+              <Radio className="w-3.5 h-3.5 animate-pulse" />
+              <span className="hidden sm:inline">Live</span>
+            </button>
 
             {/* Volume controls */}
             <div className="flex items-center gap-1 ml-1 sm:ml-2">
@@ -835,7 +768,7 @@ export const YouTubePlayer: React.FC = () => {
                 className="w-14 sm:w-20 h-1.5 bg-slate-800 rounded-lg appearance-none accent-slate-300 cursor-pointer"
                 aria-label="Volume slider"
               />
-              {isMuted && !!syncState?.videoId && !isScreenSharing && (
+              {isMuted && !!syncState?.videoId && (
                 <button
                   onClick={handleUnmuteAudio}
                   className="px-2.5 py-1 rounded-lg bg-pink-500/20 hover:bg-pink-500/30 text-pink-400 border border-pink-500/40 text-xs font-semibold flex items-center gap-1 transition animate-pulse ml-1"
@@ -848,33 +781,8 @@ export const YouTubePlayer: React.FC = () => {
             </div>
           </div>
 
-          {/* Right: Screen Share, Settings, Change Video & Fullscreen */}
+          {/* Right: Settings, Change Video & Fullscreen */}
           <div className="flex items-center gap-2">
-            {/* Screen Share Button (Host/Moderator only) */}
-            {canControl && (
-              <button
-                onClick={isLocalScreenShare ? stopScreenShare : startScreenShare}
-                className={`px-3 py-2 rounded-xl text-xs font-medium transition flex items-center gap-1.5 ${
-                  isLocalScreenShare
-                    ? 'bg-red-500/20 text-red-400 border border-red-500/40 hover:bg-red-500/30'
-                    : 'bg-white/10 hover:bg-white/20 text-slate-200'
-                }`}
-                title={isLocalScreenShare ? 'Stop Sharing Screen' : 'Share Screen with Room'}
-              >
-                {isLocalScreenShare ? (
-                  <>
-                    <StopCircle className="w-3.5 h-3.5 text-red-400 animate-pulse" />
-                    <span>Stop Screen</span>
-                  </>
-                ) : (
-                  <>
-                    <MonitorUp className="w-3.5 h-3.5 text-brand-pink" />
-                    <span>Share Screen</span>
-                  </>
-                )}
-              </button>
-            )}
-
             {/* Settings Menu (Speed & Quality) */}
             <div className="relative">
               <button
