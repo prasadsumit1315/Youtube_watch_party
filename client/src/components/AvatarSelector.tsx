@@ -139,3 +139,4 @@ export const AvatarSelector: React.FC<AvatarSelectorProps> = ({
     </div>
   );
 };
+

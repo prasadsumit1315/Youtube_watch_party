@@ -232,6 +232,24 @@ export class SocketMessageHandler {
             reconnectToken: participant.reconnectToken,
           });
 
+          // Notify other participants immediately (zero lag on join)
+          if (!isReconnect) {
+            socket.to(room.id).emit('user_joined', {
+              user: participant.toPublicJSON(),
+            });
+
+            // Persist participant in DB asynchronously
+            persistWithRetry(
+              () => this.memberRepo.upsertMember(room.id, participant!.userId, username, participant!.role),
+              'upsertMember'
+            ).catch(() => {});
+          } else {
+            persistWithRetry(
+              () => this.memberRepo.upsertMember(room.id, participant!.userId, username, participant!.role),
+              'upsertMemberReconnect'
+            ).catch(() => {});
+          }
+
           // Send recent chat history if stored in DB
           if (env.PERSIST_CHAT && env.DATABASE_URL) {
             try {
@@ -249,24 +267,6 @@ export class SocketMessageHandler {
             } catch {
               // Ignore if chat history fetch fails
             }
-          }
-
-          // Notify other participants in the room
-          if (!isReconnect) {
-            socket.to(room.id).emit('user_joined', {
-              user: participant.toPublicJSON(),
-            });
-
-            // Persist participant in DB asynchronously
-            persistWithRetry(
-              () => this.memberRepo.upsertMember(room.id, participant!.userId, username, participant!.role),
-              'upsertMember'
-            ).catch(() => {});
-          } else {
-            persistWithRetry(
-              () => this.memberRepo.upsertMember(room.id, participant!.userId, username, participant!.role),
-              'upsertMemberReconnect'
-            ).catch(() => {});
           }
 
           if (env.DATABASE_URL) {
